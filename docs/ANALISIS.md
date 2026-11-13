@@ -64,3 +64,15 @@ Verificación con espectros sintéticos (A con +6/+10/−8 dB, B con +0/+4, Morp
 * En modo tercios, el aprendizaje usa bloques de 16384 muestras con avance 12288 (resolución fina), no los de
   1024/768 del modo de bandas iguales.
 * **Reset** pone todos los sliders a 0, borra lo aprendido y desactiva Learn y Match.
+
+## Interfaz original: las bolitas sobre los sliders (de la DLL, por análisis estático)
+
+Hay 30 indicadores (uno por banda), creados como botones de mapa de bits **deshabilitados**: solo muestran estado.
+
+* **Qué marcan:** la banda que se está tocando. Al mover un slider se enciende la bolita de esa banda y se apaga la
+  anterior (una sola encendida). Si se selecciona un rango de bandas, se encienden todas las del rango. Se apagan al
+  cambiar de modo de dibujo y con Reset. (El gesto exacto que activa el rango no se ha determinado.)
+* **Color:** morado o rojo según la posición, en **grupos de 5 bandas alternos** (1–5 morado, 6–10 rojo, 11–15 morado…);
+  los marcadores de los sliders alternan igual (azul/rojo). No depende del estado. Hay un par de mapas de 9×9 por color
+  (encendido / apagado): recursos 109/110 (morado) y 150/151 (rojo).
+* No se ejecutó la DLL (exige licencia de Mastering Edition); la conclusión sale de leer el código y los recursos.

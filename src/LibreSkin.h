@@ -22,16 +22,20 @@ public:
     void drawGraphFrame (juce::Graphics&, juce::Rectangle<float>) const;
     void drawSliderTrack (juce::Graphics&, juce::Rectangle<float>) const;
     void drawSliderThumb (juce::Graphics&, juce::Rectangle<float>) const;
-    void drawLed (juce::Graphics&, juce::Rectangle<float>, bool lit) const;
+    // Bolita indicadora de banda: morada o roja (grupos de 5 bandas alternos), encendida o apagada.
+    void drawLed (juce::Graphics&, juce::Rectangle<float>, bool lit, bool red) const;
     void drawCredits (juce::Graphics&, juce::Rectangle<float> area) const;   // imagen "cover" (recorta lo que sobre)
 
-    static void drawLogoLibreFilter (juce::Graphics&, juce::Rectangle<float>);
-    static void drawLogoVooD (juce::Graphics&, juce::Rectangle<float>);
+    void drawLogoPlugin (juce::Graphics&, juce::Rectangle<float>) const;    // logo LibreFilter (PNG con transparencia)
+    void drawLogoCreator (juce::Graphics&, juce::Rectangle<float>) const;   // logo VooD
 
 private:
-    static std::unique_ptr<juce::Drawable> loadSvg (const void* data, size_t size);
+    static std::unique_ptr<juce::Drawable> loadSvg (const void* data, size_t size,
+                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour = {});
+    static void drawFitted (juce::Graphics&, const juce::Image&, juce::Rectangle<float>);
 
     std::unique_ptr<juce::Drawable> background, buttonNormal, buttonActive, buttonDisabled,
-                                    graphFrame, sliderTrack, sliderThumb, knob;
-    juce::Image credits;
+                                    graphFrame, sliderTrack, sliderThumb,
+                                    ledPurpleOn, ledPurpleOff, ledRedOn, ledRedOff;
+    juce::Image credits, logoPlugin, logoCreator;
 };

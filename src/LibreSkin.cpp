@@ -54,40 +54,14 @@ namespace
             root.addChildElement (k.release());
         }
     }
-
-    // Texto en trazo: ancho fijado (el original usa Arial negrita cursiva), baseline en (x, y).
-    juce::Path wordPath (const juce::String& text, float x, float baseline, float width)
-    {
-        juce::Font f (juce::FontOptions ("Arial", 100.0f, juce::Font::bold | juce::Font::italic));
-        juce::GlyphArrangement probe;
-        probe.addLineOfText (f, text, 0.0f, 0.0f);
-        const float w0 = probe.getBoundingBox (0, -1, false).getWidth();
-        const float height = 100.0f * (w0 > 0.0f ? width / w0 : 1.0f);
-
-        juce::GlyphArrangement ga;
-        ga.addLineOfText (juce::Font (juce::FontOptions ("Arial", height, juce::Font::bold | juce::Font::italic)), text, x, baseline);
-        juce::Path p;
-        ga.createPath (p);
-        return p;
-    }
-
-    void drawWordmark (juce::Graphics& g, const juce::Path& text, juce::ColourGradient fill, float outline, float glowCyan)
-    {
-        if (glowCyan > 0.0f)
-        {
-            g.setColour (juce::Colour (0xff18dfff).withAlpha (0.20f));
-            g.strokePath (text, juce::PathStrokeType (glowCyan * 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        }
-        g.setColour (juce::Colour (0xff09203c));
-        g.strokePath (text, juce::PathStrokeType (outline * 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setGradientFill (fill);
-        g.fillPath (text);
-    }
 }
 
-std::unique_ptr<juce::Drawable> LibreSkin::loadSvg (const void* data, size_t size)
+std::unique_ptr<juce::Drawable> LibreSkin::loadSvg (const void* data, size_t size,
+                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour)
 {
-    auto xml = juce::XmlDocument::parse (juce::String::fromUTF8 (static_cast<const char*> (data), (int) size));
+    auto text = juce::String::fromUTF8 (static_cast<const char*> (data), (int) size);
+    for (const auto& r : recolour) text = text.replace (r.first, r.second);
+    auto xml = juce::XmlDocument::parse (text);
     if (xml == nullptr) return nullptr;
     preprocessSvg (*xml);
     return juce::Drawable::createFromSVG (*xml);
@@ -102,8 +76,18 @@ LibreSkin::LibreSkin()
     graphFrame     = loadSvg (BinaryData::graph_frame_svg,       (size_t) BinaryData::graph_frame_svgSize);
     sliderTrack    = loadSvg (BinaryData::slider_track_svg,      (size_t) BinaryData::slider_track_svgSize);
     sliderThumb    = loadSvg (BinaryData::slider_thumb_svg,      (size_t) BinaryData::slider_thumb_svgSize);
-    knob           = loadSvg (BinaryData::knob_purple_svg,       (size_t) BinaryData::knob_purple_svgSize);
-    credits        = juce::ImageCache::getFromMemory (BinaryData::credits_background_png, BinaryData::credits_background_pngSize);
+    // bolitas: el SVG del pack es morado; las demas variantes se obtienen cambiando los colores del degradado
+    const auto* knobSvg = BinaryData::knob_purple_svg;
+    const auto knobSize = (size_t) BinaryData::knob_purple_svgSize;
+    using Map = std::vector<std::pair<juce::String, juce::String>>;
+    ledPurpleOn  = loadSvg (knobSvg, knobSize);
+    ledPurpleOff = loadSvg (knobSvg, knobSize, Map { { "#f4d8ff", "#8d7aa8" }, { "#b65cff", "#5a3a8c" }, { "#6d20b8", "#33195c" }, { "#24113e", "#140a24" } });
+    ledRedOn     = loadSvg (knobSvg, knobSize, Map { { "#f4d8ff", "#ffd9d9" }, { "#b65cff", "#ff4646" }, { "#6d20b8", "#b81c1c" }, { "#24113e", "#3e1111" } });
+    ledRedOff    = loadSvg (knobSvg, knobSize, Map { { "#f4d8ff", "#a87a7a" }, { "#b65cff", "#8c3a3a" }, { "#6d20b8", "#5c1919" }, { "#24113e", "#240a0a" } });
+
+    credits     = juce::ImageCache::getFromMemory (BinaryData::credits_background_png, BinaryData::credits_background_pngSize);
+    logoPlugin  = juce::ImageCache::getFromMemory (BinaryData::logo_plugin_png,  BinaryData::logo_plugin_pngSize);
+    logoCreator = juce::ImageCache::getFromMemory (BinaryData::logo_creator_png, BinaryData::logo_creator_pngSize);
 }
 
 void LibreSkin::drawBackground (juce::Graphics& g, juce::Rectangle<float> area) const
@@ -162,10 +146,15 @@ void LibreSkin::drawSliderThumb (juce::Graphics& g, juce::Rectangle<float> r) co
     else { g.setColour (juce::Colours::white); g.fillRect (r); }
 }
 
-void LibreSkin::drawLed (juce::Graphics& g, juce::Rectangle<float> r, bool lit) const
+void LibreSkin::drawLed (juce::Graphics& g, juce::Rectangle<float> r, bool lit, bool red) const
 {
-    if (knob != nullptr) knob->drawWithin (g, r, juce::RectanglePlacement::stretchToFit, lit ? 1.0f : 0.75f);
-    else { g.setColour (lit ? juce::Colour (0xffb65cff) : juce::Colour (0xff5b3b86)); g.fillEllipse (r); }
+    const auto* d = red ? (lit ? ledRedOn.get() : ledRedOff.get()) : (lit ? ledPurpleOn.get() : ledPurpleOff.get());
+    if (d != nullptr) d->drawWithin (g, r, juce::RectanglePlacement::stretchToFit, 1.0f);
+    else
+    {
+        g.setColour (red ? (lit ? juce::Colour (0xffff4646) : juce::Colour (0xff5c1919)) : (lit ? juce::Colour (0xffb65cff) : juce::Colour (0xff33195c)));
+        g.fillEllipse (r);
+    }
 }
 
 void LibreSkin::drawCredits (juce::Graphics& g, juce::Rectangle<float> area) const
@@ -182,32 +171,12 @@ void LibreSkin::drawCredits (juce::Graphics& g, juce::Rectangle<float> area) con
     g.restoreState();
 }
 
-// logo_librefilter.svg: 440 x 90, texto de 58 px en (8, 61), degradado blanco -> celeste y trazo celeste debajo.
-void LibreSkin::drawLogoLibreFilter (juce::Graphics& g, juce::Rectangle<float> r)
+void LibreSkin::drawFitted (juce::Graphics& g, const juce::Image& img, juce::Rectangle<float> area)
 {
-    const float s = juce::jmin (r.getWidth() / 440.0f, r.getHeight() / 90.0f);
-    const auto o = r.getTopLeft();
-    const auto text = wordPath ("LibreFilter", o.x + 8.0f * s, o.y + 61.0f * s, 402.0f * s);
-
-    juce::ColourGradient grad (juce::Colours::white, o.x + 8.0f * s, o.y, juce::Colour (0xff18dfff), o.x + 410.0f * s, o.y, false);
-    grad.addColour (0.58, juce::Colour (0xffd7edff));
-    drawWordmark (g, text, grad, 1.5f * s, 2.5f * s);
-
-    juce::Path swoosh;
-    swoosh.startNewSubPath (o.x + 24.0f * s, o.y + 78.0f * s);
-    swoosh.quadraticTo (o.x + 205.0f * s, o.y + 88.0f * s, o.x + 410.0f * s, o.y + 65.0f * s);
-    g.setColour (juce::Colour (0xff00cfff).withAlpha (0.18f));
-    g.strokePath (swoosh, juce::PathStrokeType (9.0f * s, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-    g.setColour (juce::Colour (0xff00cfff));
-    g.strokePath (swoosh, juce::PathStrokeType (3.0f * s, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    if (! img.isValid()) return;
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.drawImage (img, area, juce::RectanglePlacement::centred);
 }
 
-// logo_vood.svg: 220 x 70, texto de 48 px en (8, 49), degradado blanco -> azul claro.
-void LibreSkin::drawLogoVooD (juce::Graphics& g, juce::Rectangle<float> r)
-{
-    const float s = juce::jmin (r.getWidth() / 220.0f, r.getHeight() / 70.0f);
-    const auto o = r.getTopLeft();
-    const auto text = wordPath ("VooD", o.x + 8.0f * s, o.y + 49.0f * s, 118.0f * s);
-    juce::ColourGradient grad (juce::Colours::white, 0.0f, o.y + 8.0f * s, juce::Colour (0xffa8c7e8), 0.0f, o.y + 52.0f * s, false);
-    drawWordmark (g, text, grad, 1.5f * s, 0.0f);
-}
+void LibreSkin::drawLogoPlugin (juce::Graphics& g, juce::Rectangle<float> r) const  { drawFitted (g, logoPlugin, r); }
+void LibreSkin::drawLogoCreator (juce::Graphics& g, juce::Rectangle<float> r) const { drawFitted (g, logoCreator, r); }

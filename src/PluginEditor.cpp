@@ -153,7 +153,7 @@ void FreeFilterEditor::setBand (int b, float dB)
     }
 }
 
-void FreeFilterEditor::resetAll() { processor.requestReset(); }
+void FreeFilterEditor::resetAll() { processor.requestReset(); clearLeds(); }
 
 //==============================================================================
 void FreeFilterEditor::resized() { rebuildBackground(); layoutPresetEditor(); }
@@ -171,6 +171,10 @@ void FreeFilterEditor::rebuildBackground()
     skin.drawBackground (g, { 0.0f, 0.0f, (float) pw, (float) ph });
 
     g.addTransform (juce::AffineTransform::scale ((float) pw / designW, (float) ph / designH));
+
+    // logos (PNG con transparencia): del plugin arriba a la derecha y del creador abajo a la derecha
+    skin.drawLogoPlugin (g, logoRect);
+    skin.drawLogoCreator (g, creatorRect);
 
     // fila de lecturas
     g.setColour (juce::Colours::black.withAlpha (0.28f));
@@ -271,7 +275,7 @@ void FreeFilterEditor::paintBands (juce::Graphics& g)
         skin.drawSliderThumb (g, { x + 1.5f, vy - 7.0f, bandW - 3.0f, 14.0f });
 
         // "LED" superior
-        skin.drawLed (g, { x + (bandW - 20.0f) * 0.5f, boardRect.getY() - 28.0f, 20.0f, 20.0f }, std::abs (v) > 0.05f);
+        skin.drawLed (g, { x + (bandW - ledSize) * 0.5f, boardRect.getY() - ledOffset, ledSize, ledSize }, led[(size_t) b], (b / 5) % 2 == 1);
     }
 
     // linea de 0 dB
@@ -387,8 +391,8 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
     for (auto& l : legend)
     {
         g.setColour (l.c);
-        g.fillRect (l.x, 555.0f, 34.0f, 4.0f);
-        g.drawText (l.name, juce::Rectangle<float> (l.x + 44.0f, 542.0f, 110.0f, 30.0f), juce::Justification::centredLeft, false);
+        g.fillRect (l.x, legendLineY, 34.0f, 4.0f);
+        g.drawText (l.name, juce::Rectangle<float> (l.x + 44.0f, legendTextY, 110.0f, legendTextH), juce::Justification::centredLeft, false);
     }
 }
 
@@ -398,8 +402,6 @@ void FreeFilterEditor::paint (juce::Graphics& g)
     if (showAbout) { paintAbout (g); return; }
 
     g.addTransform (designToScreen());
-
-    LibreSkin::drawLogoLibreFilter (g, logoRect);
 
     // fila de lecturas (Morph / Hz / dB)
     {
@@ -449,8 +451,7 @@ void FreeFilterEditor::paint (juce::Graphics& g)
         }
     }
 
-    // credito y version en la esquina inferior derecha
-    LibreSkin::drawLogoVooD (g, voodRect);
+    // version bajo el credito (el logo del creador esta en el fondo)
     g.setFont (uiFont (15.0f));
     g.setColour (textLight.withAlpha (0.6f));
     g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
@@ -461,9 +462,9 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
     skin.drawCredits (g, getLocalBounds().toFloat());
     g.addTransform (designToScreen());
 
-    LibreSkin::drawLogoLibreFilter (g, juce::Rectangle<float> (190.0f, 70.0f, 560.0f, 114.0f));
+    skin.drawLogoPlugin (g, juce::Rectangle<float> (170.0f, 40.0f, 600.0f, 180.0f));
 
-    const juce::Rectangle<float> panel (90.0f, 230.0f, 760.0f, 380.0f);
+    const juce::Rectangle<float> panel (90.0f, 250.0f, 760.0f, 380.0f);
     g.setColour (juce::Colour (0xff030c1a).withAlpha (0.55f));
     g.fillRoundedRectangle (panel, 18.0f);
     g.setColour (boxLine.withAlpha (0.45f));
@@ -481,7 +482,7 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
                           "Clic para cerrar."),
                       panel.reduced (24.0f).toNearestInt(), juce::Justification::centred, 12);
 
-    LibreSkin::drawLogoVooD (g, juce::Rectangle<float> (0.0f, 0.0f, 205.0f, 65.0f).withCentre ({ designW * 0.5f + 4.0f, 690.0f }));
+    skin.drawLogoCreator (g, juce::Rectangle<float> (0.0f, 0.0f, 320.0f, 70.0f).withCentre ({ designW * 0.5f, 720.0f }));
     g.setFont (uiFont (15.0f));
     g.setColour (textLight.withAlpha (0.6f));
     g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
@@ -613,7 +614,7 @@ void FreeFilterEditor::timerCallback()
         update (specIn, false);
         update (specOut, true);
     }
-    repaint();
+    if (! showAbout) repaint();      // la pantalla de creditos es estatica
 }
 
 //==============================================================================
@@ -651,9 +652,9 @@ void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
         if (! buttonRect (id).contains (p)) continue;
         switch (id)
         {
-            case ModeFree:  drawMode = DrawMode::freehand; break;
-            case ModeLevel: drawMode = DrawMode::level;    break;
-            case ModeLine:  drawMode = DrawMode::line;     break;
+            case ModeFree:  drawMode = DrawMode::freehand; clearLeds(); break;
+            case ModeLevel: drawMode = DrawMode::level;    clearLeds(); break;
+            case ModeLine:  drawMode = DrawMode::line;     clearLeds(); break;
             case Reset:     resetAll();                    break;
             case Freeze:
                 if (auto* prm = processor.apvts.getParameter ("freeze"))
@@ -703,6 +704,7 @@ void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
         dragStart = p;
         lastBand = -1;
         draggingBoard = true;
+        clearLeds();
         for (int b = 0; b < ff::kBands; ++b) startValues[(size_t) b] = processor.getBandValue (b);
         mouseDrag (e);
     }
@@ -756,6 +758,15 @@ void FreeFilterEditor::mouseDrag (const juce::MouseEvent& e)
         }
     }
     lastBand = b;
+
+    // bolitas: en dibujo libre, todo el rango tocado; en nivel y recta (que mueven muchas bandas), solo la banda bajo el puntero
+    if (drawMode == DrawMode::freehand && ! touched.empty())
+        setLedRange (*touched.begin(), *touched.rbegin());
+    else
+    {
+        clearLeds();
+        led[(size_t) b] = true;
+    }
     mouseMove (e);
 }
 
@@ -774,9 +785,13 @@ void FreeFilterEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
     if (! boardRect.expanded (0.0f, 12.0f).contains (p)) return;
+    clearLeds();
     if (drawMode == DrawMode::level)          // solo los sliders; lo aprendido y Match no se tocan (eso es Reset)
         for (int i = 0; i < ff::kBands; ++i) setBand (i, 0.0f);
     else
+    {
         setBand (bandAt (p.x), 0.0f);
+        led[(size_t) bandAt (p.x)] = true;
+    }
     mouseUp (e);
 }

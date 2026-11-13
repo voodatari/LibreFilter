@@ -45,7 +45,9 @@ La rama `skin-librefilter` contiene la skin nueva; `git switch skin-librefilter`
   **Reset** pone todo a 0, borra lo aprendido y desactiva Learn/Match (el doble clic en modo nivel solo pone los
   sliders a 0). **Freeze** congela el analizador, el filtro actual (los sliders y Match no lo cambian) y el aprendizaje;
   el audio sigue pasando por el filtro congelado.
-* Clic en el título → créditos.
+* Las **bolitas** sobre los sliders marcan la banda que se está tocando (o el rango tocado al dibujar en modo libre),
+  como en el original; alternan morado/rojo cada 5 bandas.
+* Clic en el logo → créditos.
 
 ## Compilar
 

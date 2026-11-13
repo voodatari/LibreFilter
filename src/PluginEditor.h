@@ -48,6 +48,12 @@ private:
     float dbToY (float db) const;
 
     void setBand (int b, float dB);
+
+    // Bolitas sobre los sliders (como en el original): marcan la banda que se esta tocando o, al dibujar
+    // sobre varias a la vez, el rango tocado. Se apagan al cambiar de modo de dibujo y con Reset.
+    std::array<bool, ff::kBands> led {};
+    void clearLeds() { led.fill (false); }
+    void setLedRange (int lo, int hi) { clearLeds(); for (int i = lo; i <= hi; ++i) led[(size_t) i] = true; }
     void resetAll();
     bool isLogAxis() const;
 

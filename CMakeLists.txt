@@ -58,7 +58,9 @@ juce_add_binary_data(FreeFilterAssets
         resources/librefilter/slider_track.svg
         resources/librefilter/slider_thumb.svg
         resources/librefilter/knob_purple.svg
-        resources/librefilter/credits_background.png)
+        resources/librefilter/credits_background.png
+        resources/librefilter/logo_plugin.png
+        resources/librefilter/logo_creator.png)
 set_target_properties(FreeFilterAssets PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_sources(FreeFilter PRIVATE
