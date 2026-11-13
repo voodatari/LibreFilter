@@ -3,6 +3,74 @@
 
 namespace
 {
+    // Recoloreado del tema rojo. Los grises, blancos y verdes no cambian.
+    //  panel:   azul/cian/morado -> rojo/naranja, mas saturado y algo mas brillante (como el panel original)
+    //  neutral: -> gris con un toque calido (botones claros del original, con buen contraste)
+    //  gold:    -> ambar vivo para los logos; los contornos oscuros se mantienen oscuros
+    enum class RedMode { panel, neutral, gold };
+
+    juce::Colour toRed (juce::Colour c, RedMode mode = RedMode::panel)
+    {
+        float h, sat, b;
+        c.getHSB (h, sat, b);
+        const float deg = h * 360.0f;
+        if (sat < 0.12f || deg < 170.0f || deg > 290.0f) return c;
+
+        if (mode == RedMode::neutral)
+            return juce::Colour::fromHSV (10.0f / 360.0f, sat * 0.14f, b, c.getFloatAlpha());
+
+        if (mode == RedMode::gold)
+        {
+            const float lift = juce::jlimit (0.0f, 1.0f, (b - 0.25f) / 0.35f);          // 0 en oscuros, 1 en claros
+            const float nb = b + (std::pow (b, 0.5f) - b) * lift;
+            return juce::Colour::fromHSV ((36.0f + (deg - 190.0f) * 0.1f) / 360.0f, juce::jmin (1.0f, sat * 1.15f), nb, c.getFloatAlpha());
+        }
+
+        float nh = (4.0f + (deg - 190.0f) * 0.25f) / 360.0f;
+        if (nh < 0.0f) nh += 1.0f;
+        return juce::Colour::fromHSV (nh, juce::jmin (1.0f, sat * 1.15f), std::pow (b, 0.8f), c.getFloatAlpha());
+    }
+
+    juce::String redShiftSvg (const juce::String& svg, RedMode mode)
+    {
+        const std::string in = svg.toStdString();
+        std::string out;
+        out.reserve (in.size());
+        auto hex = [] (char ch) { return std::isxdigit ((unsigned char) ch) != 0; };
+        for (size_t i = 0; i < in.size(); ++i)
+        {
+            if (in[i] == '#' && i + 6 < in.size() && hex (in[i + 1]) && hex (in[i + 2]) && hex (in[i + 3])
+                && hex (in[i + 4]) && hex (in[i + 5]) && hex (in[i + 6]))
+            {
+                const auto c = toRed (juce::Colour ((juce::uint32) (0xff000000u | (juce::uint32) std::stoul (in.substr (i + 1, 6), nullptr, 16))), mode);
+                out += "#" + c.toDisplayString (false).toLowerCase().toStdString();
+                i += 6;
+            }
+            else
+                out += in[i];
+        }
+        return juce::String (out);
+    }
+
+    juce::Image redShiftImage (const juce::Image& src, RedMode mode)
+    {
+        if (! src.isValid()) return {};
+        juce::Image img = src.createCopy().convertedToFormat (juce::Image::ARGB);   // copia: no tocar el original azul
+        juce::Image::BitmapData d (img, juce::Image::BitmapData::readWrite);
+        for (int y = 0; y < d.height; ++y)
+            for (int x = 0; x < d.width; ++x)
+            {
+                auto* px = reinterpret_cast<juce::PixelARGB*> (d.getPixelPointer (x, y));
+                const auto a = px->getAlpha();
+                if (a == 0) continue;
+                px->unpremultiply();
+                const auto c = toRed (juce::Colour (px->getInARGBMaskOrder()), mode);
+                px->setARGB (a, c.getRed(), c.getGreen(), c.getBlue());
+                px->premultiply();
+            }
+        return img;
+    }
+
     // Quita lo que JUCE no sabe pintar y convierte los filtros de brillo (feGaussianBlur) en halos de capas.
     void preprocessSvg (juce::XmlElement& root)
     {
@@ -57,10 +125,11 @@ namespace
 }
 
 std::unique_ptr<juce::Drawable> LibreSkin::loadSvg (const void* data, size_t size,
-                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour)
+                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour, int redMode)
 {
     auto text = juce::String::fromUTF8 (static_cast<const char*> (data), (int) size);
     for (const auto& r : recolour) text = text.replace (r.first, r.second);
+    if (redMode != 0) text = redShiftSvg (text, redMode == 2 ? RedMode::neutral : RedMode::panel);
     auto xml = juce::XmlDocument::parse (text);
     if (xml == nullptr) return nullptr;
     preprocessSvg (*xml);
@@ -69,13 +138,28 @@ std::unique_ptr<juce::Drawable> LibreSkin::loadSvg (const void* data, size_t siz
 
 LibreSkin::LibreSkin()
 {
-    background     = loadSvg (BinaryData::plugin_background_svg, (size_t) BinaryData::plugin_background_svgSize);
-    buttonNormal   = loadSvg (BinaryData::button_normal_svg,     (size_t) BinaryData::button_normal_svgSize);
+    creditsBlue     = juce::ImageCache::getFromMemory (BinaryData::credits_background_png, BinaryData::credits_background_pngSize);
+    logoPluginBlue  = juce::ImageCache::getFromMemory (BinaryData::logo_plugin_png,  BinaryData::logo_plugin_pngSize);
+    logoCreatorBlue = juce::ImageCache::getFromMemory (BinaryData::logo_creator_png, BinaryData::logo_creator_pngSize);
+    load();
+}
+
+void LibreSkin::setRedTheme (bool red)
+{
+    if (red == redTheme) return;
+    redTheme = red;
+    load();
+}
+
+void LibreSkin::load()
+{
+    background     = loadSvg (BinaryData::plugin_background_svg, (size_t) BinaryData::plugin_background_svgSize, {}, redTheme ? 1 : 0);
+    buttonNormal   = loadSvg (BinaryData::button_normal_svg,     (size_t) BinaryData::button_normal_svgSize, {}, redTheme ? 2 : 0);
     buttonActive   = loadSvg (BinaryData::button_active_svg,     (size_t) BinaryData::button_active_svgSize);
-    buttonDisabled = loadSvg (BinaryData::button_disabled_svg,   (size_t) BinaryData::button_disabled_svgSize);
-    graphFrame     = loadSvg (BinaryData::graph_frame_svg,       (size_t) BinaryData::graph_frame_svgSize);
-    sliderTrack    = loadSvg (BinaryData::slider_track_svg,      (size_t) BinaryData::slider_track_svgSize);
-    sliderThumb    = loadSvg (BinaryData::slider_thumb_svg,      (size_t) BinaryData::slider_thumb_svgSize);
+    buttonDisabled = loadSvg (BinaryData::button_disabled_svg,   (size_t) BinaryData::button_disabled_svgSize, {}, redTheme ? 2 : 0);
+    graphFrame     = loadSvg (BinaryData::graph_frame_svg,       (size_t) BinaryData::graph_frame_svgSize, {}, redTheme ? 1 : 0);
+    sliderTrack    = loadSvg (BinaryData::slider_track_svg,      (size_t) BinaryData::slider_track_svgSize, {}, redTheme ? 1 : 0);
+    sliderThumb    = loadSvg (BinaryData::slider_thumb_svg,      (size_t) BinaryData::slider_thumb_svgSize, {}, redTheme ? 1 : 0);
     // bolitas: el SVG del pack es morado; las demas variantes se obtienen cambiando los colores del degradado
     const auto* knobSvg = BinaryData::knob_purple_svg;
     const auto knobSize = (size_t) BinaryData::knob_purple_svgSize;
@@ -85,9 +169,15 @@ LibreSkin::LibreSkin()
     ledRedOn     = loadSvg (knobSvg, knobSize, Map { { "#f4d8ff", "#ffd9d9" }, { "#b65cff", "#ff4646" }, { "#6d20b8", "#b81c1c" }, { "#24113e", "#3e1111" } });
     ledRedOff    = loadSvg (knobSvg, knobSize, Map { { "#f4d8ff", "#a87a7a" }, { "#b65cff", "#8c3a3a" }, { "#6d20b8", "#5c1919" }, { "#24113e", "#240a0a" } });
 
-    credits     = juce::ImageCache::getFromMemory (BinaryData::credits_background_png, BinaryData::credits_background_pngSize);
-    logoPlugin  = juce::ImageCache::getFromMemory (BinaryData::logo_plugin_png,  BinaryData::logo_plugin_pngSize);
-    logoCreator = juce::ImageCache::getFromMemory (BinaryData::logo_creator_png, BinaryData::logo_creator_pngSize);
+    if (redTheme)
+    {
+        if (! creditsRed.isValid())     creditsRed     = redShiftImage (creditsBlue, RedMode::panel);
+        if (! logoPluginRed.isValid())  logoPluginRed  = redShiftImage (logoPluginBlue, RedMode::gold);
+        if (! logoCreatorRed.isValid()) logoCreatorRed = redShiftImage (logoCreatorBlue, RedMode::gold);
+    }
+    credits     = redTheme ? creditsRed     : creditsBlue;
+    logoPlugin  = redTheme ? logoPluginRed  : logoPluginBlue;
+    logoCreator = redTheme ? logoCreatorRed : logoCreatorBlue;
 }
 
 void LibreSkin::drawBackground (juce::Graphics& g, juce::Rectangle<float> area) const
@@ -99,6 +189,23 @@ void LibreSkin::drawBackground (juce::Graphics& g, juce::Rectangle<float> area) 
     panel.addRoundedRectangle (area, 24.0f * sx);
     g.reduceClipRegion (panel);
 
+    if (redTheme)
+    {
+        // panel rojo del plugin original: degradado y trama metalica fina
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffc2432f), 0.0f, area.getY(), juce::Colour (0xff8f2a1f), 0.0f, area.getBottom(), false));
+        g.fillRect (area);
+        juce::Random rng (0xF1F1);
+        for (float y = area.getY(); y < area.getBottom(); y += 1.0f)
+        {
+            const float a = rng.nextFloat();
+            g.setColour ((a > 0.5f ? juce::Colours::white : juce::Colours::black).withAlpha (0.015f + 0.05f * std::abs (a - 0.5f)));
+            g.drawHorizontalLine ((int) y, area.getX(), area.getRight());
+        }
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.drawRoundedRectangle (area.reduced (0.5f), 24.0f * sx, 1.0f);
+        g.restoreState();          // devuelve el color/opacidad anteriores (JUCE usa el alfa actual al pintar imagenes)
+        return;
+    }
     if (background != nullptr)
         background->draw (g, 1.0f, juce::AffineTransform::scale (sx, sy).translated (area.getX(), area.getY()));
     else
@@ -175,6 +282,7 @@ void LibreSkin::drawFitted (juce::Graphics& g, const juce::Image& img, juce::Rec
 {
     if (! img.isValid()) return;
     g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    g.setOpacity (1.0f);
     g.drawImage (img, area, juce::RectanglePlacement::centred);
 }
 

@@ -65,29 +65,29 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           set -e
-          OUT=build/FreeFilter_artefacts/Release
+          OUT=build/LibreFilter_artefacts/Release
           mkdir -p dist
-          for b in "$OUT/VST3/FreeFilter.vst3" "$OUT/AU/FreeFilter.component" "$OUT/Standalone/FreeFilter.app"; do
+          for b in "$OUT/VST3/LibreFilter.vst3" "$OUT/AU/LibreFilter.component" "$OUT/Standalone/LibreFilter.app"; do
             codesign --force --deep --sign - "$b"
             codesign --verify --deep --strict "$b"
           done
-          lipo -archs "$OUT/VST3/FreeFilter.vst3/Contents/MacOS/FreeFilter"
-          ditto -c -k --keepParent "$OUT/VST3/FreeFilter.vst3"       "dist/FreeFilter-VST3-${{ matrix.id }}.zip"
-          ditto -c -k --keepParent "$OUT/AU/FreeFilter.component"    "dist/FreeFilter-AU-${{ matrix.id }}.zip"
-          ditto -c -k --keepParent "$OUT/Standalone/FreeFilter.app"  "dist/FreeFilter-Standalone-${{ matrix.id }}.zip"
+          lipo -archs "$OUT/VST3/LibreFilter.vst3/Contents/MacOS/LibreFilter"
+          ditto -c -k --keepParent "$OUT/VST3/LibreFilter.vst3"       "dist/LibreFilter-VST3-${{ matrix.id }}.zip"
+          ditto -c -k --keepParent "$OUT/AU/LibreFilter.component"    "dist/LibreFilter-AU-${{ matrix.id }}.zip"
+          ditto -c -k --keepParent "$OUT/Standalone/LibreFilter.app"  "dist/LibreFilter-Standalone-${{ matrix.id }}.zip"
 
       - name: Empaquetar - Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $out = "build/FreeFilter_artefacts/Release"
+          $out = "build/LibreFilter_artefacts/Release"
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path "$out/VST3/FreeFilter.vst3"       -DestinationPath "dist/FreeFilter-VST3-${{ matrix.id }}.zip"
-          Compress-Archive -Path "$out/Standalone/FreeFilter.exe"  -DestinationPath "dist/FreeFilter-Standalone-${{ matrix.id }}.zip"
+          Compress-Archive -Path "$out/VST3/LibreFilter.vst3"       -DestinationPath "dist/LibreFilter-VST3-${{ matrix.id }}.zip"
+          Compress-Archive -Path "$out/Standalone/LibreFilter.exe"  -DestinationPath "dist/LibreFilter-Standalone-${{ matrix.id }}.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: FreeFilter-${{ matrix.id }}
+          name: LibreFilter-${{ matrix.id }}
           path: dist/*.zip
           if-no-files-found: error
 

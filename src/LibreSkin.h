@@ -16,6 +16,10 @@ public:
 
     LibreSkin();
 
+    // Tema rojizo (easter egg, recuerda al plugin original de Steinberg): recolorea los SVG/PNG del pack al vuelo.
+    void setRedTheme (bool red);
+    bool isRedTheme() const { return redTheme; }
+
     // Panel completo (ondas, borde, grano) recortado a su esquina redondeada; w x h = tamano en pixeles.
     void drawBackground (juce::Graphics&, juce::Rectangle<float> area) const;
     void drawButton (juce::Graphics&, juce::Rectangle<float>, ButtonState) const;
@@ -30,12 +34,17 @@ public:
     void drawLogoCreator (juce::Graphics&, juce::Rectangle<float>) const;   // logo VooD
 
 private:
+    void load();
     static std::unique_ptr<juce::Drawable> loadSvg (const void* data, size_t size,
-                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour = {});
+                                                    const std::vector<std::pair<juce::String, juce::String>>& recolour = {},
+                                                    int redMode = 0);   // 0 azul, 1 rojo (panel), 2 rojo neutro (botones)
     static void drawFitted (juce::Graphics&, const juce::Image&, juce::Rectangle<float>);
 
     std::unique_ptr<juce::Drawable> background, buttonNormal, buttonActive, buttonDisabled,
                                     graphFrame, sliderTrack, sliderThumb,
                                     ledPurpleOn, ledPurpleOff, ledRedOn, ledRedOff;
-    juce::Image credits, logoPlugin, logoCreator;
+    juce::Image credits, logoPlugin, logoCreator;                       // los del tema actual
+    juce::Image creditsBlue, logoPluginBlue, logoCreatorBlue;           // originales del pack
+    juce::Image creditsRed, logoPluginRed, logoCreatorRed;              // recoloreados (se crean al primer uso)
+    bool redTheme = false;
 };

@@ -5,14 +5,15 @@
 #include <array>
 #include <atomic>
 #include <memory>
-#include "FreeFilterDSP.h"
+#include "LibreFilterDSP.h"
+#include "PartitionedConvolver.h"
 
-class FreeFilterProcessor : public juce::AudioProcessor,
+class LibreFilterProcessor : public juce::AudioProcessor,
                             private juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    FreeFilterProcessor();
-    ~FreeFilterProcessor() override;
+    LibreFilterProcessor();
+    ~LibreFilterProcessor() override;
 
     void prepareToPlay (double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
@@ -22,7 +23,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
-    const juce::String getName() const override { return "FreeFilter"; }
+    const juce::String getName() const override { return "LibreFilter"; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.2; }
@@ -61,10 +62,14 @@ public:
 
     void requestReset();     // sliders a 0, aprendizaje borrado, Match y Learn desactivados
 
-    // Curvas aprendidas: guardar / cargar el lado indicado (true = Dest, false = Source) en un archivo .ffcurve
+    // Curvas aprendidas: guardar / cargar el lado indicado (true = Dest, false = Source) en un archivo .lfcurve
     bool saveLearned (bool dest, const juce::File& file);
     // Si el archivo se guardó a otra frecuencia de muestreo, el espectro se remapea por frecuencia (fileSampleRate lo devuelve).
     bool loadLearned (bool dest, const juce::File& file, double* fileSampleRate = nullptr);
+
+    // Tema visual (easter egg): se guarda en el estado del proyecto, no es un parametro
+    bool isRedTheme() const { return (bool) apvts.state.getProperty ("redTheme", false); }
+    void setRedTheme (bool red) { apvts.state.setProperty ("redTheme", red, nullptr); }
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -75,9 +80,9 @@ private:
     // ---- diseno del filtro (hilo secundario) ----
     struct DesignJob
     {
-        ff::Mode mode = ff::Mode::Equal;
+        lf::Mode mode = lf::Mode::Equal;
         double sampleRate = 44100.0;
-        std::array<float, ff::kBands> sliders {};
+        std::array<float, lf::kBands> sliders {};
         float morph = 1.0f;
         bool match = false;
         uint32_t version = 0;
@@ -85,30 +90,31 @@ private:
     class Designer;
     void postDesign (const DesignJob& job);
     void runDesign (const DesignJob& job);   // en el hilo de diseno
-    void publishResponse (const std::vector<double>& response, ff::Mode mode, double sr);
+    void publishResponse (const std::vector<double>& response, lf::Mode mode, double sr);
 
     void takeMatchSnapshot();
 
     std::unique_ptr<Designer> designer;
 
     // parametros
-    std::array<std::atomic<float>*, ff::kBands> bandParams {}, matchParams {};
+    std::array<std::atomic<float>*, lf::kBands> bandParams {}, matchParams {};
 
     // ---- audio ----
-    ff::Mode activeMode = ff::Mode::Equal;
-    std::array<float, ff::kEqTaps> taps {}, prevTaps {};
-    std::array<ff::FirChannel, 2> fir;
+    lf::Mode activeMode = lf::Mode::Equal;
+    std::array<float, lf::kEqTaps> taps {}, prevTaps {};
+    std::array<lf::FirChannel, 2> fir;
     int xfadeLeft = 0;
     static constexpr int kXfade = 256;
     static constexpr int kChunk = 4096;
     std::array<float, kChunk> monoIn {}, monoOut {};
-    juce::dsp::Convolution convolution { juce::dsp::Convolution::NonUniform { 256 } };
+    static constexpr int kLogLatency = lf::kThHalf + lf::PartitionedConvolver::kBlock;   // retardo de fase lineal + bloque
+    lf::PartitionedConvolver thirdConv;     // modo Log: convolucion particionada con cambio de respuesta por fundido
 
     std::atomic<double> currentSampleRate { 44100.0 };
 
     // publicacion de coeficientes (modo bandas iguales)
     juce::SpinLock pubLock;
-    std::array<float, ff::kEqTaps> pubTaps {};
+    std::array<float, lf::kEqTaps> pubTaps {};
     std::atomic<bool> pubReady { false };
 
     // respuesta para dibujar (1024 puntos log entre 10 Hz y 0.995 Nyquist)
@@ -118,7 +124,7 @@ private:
     float respFHi = 20000.0f;
 
     // aprendizaje (lo aprendido persiste entre parada/arranque y se guarda en el proyecto)
-    ff::SpectrumLearner learnerEq, learnerTh;
+    lf::SpectrumLearner learnerEq, learnerTh;
     juce::SpinLock learnLock;                 // protege sumas y contadores frente al hilo de mensajes
     std::atomic<uint32_t> dataVersion { 0 };
     uint32_t lastDataVersion = 0;
@@ -135,11 +141,11 @@ private:
     std::atomic<bool> resetRequested { false };
 
     // firma del ultimo diseno enviado
-    ff::Mode lastSigMode = ff::Mode::Equal;
+    lf::Mode lastSigMode = lf::Mode::Equal;
     bool lastSigMatch = false;
     float lastSigMorph = -1.0f;
     uint32_t lastSigSnap = 0;
-    std::array<float, ff::kBands> lastSigSliders {};
+    std::array<float, lf::kBands> lastSigSliders {};
     bool haveSig = false;
 
     // anillos de captura para el analizador
@@ -147,5 +153,5 @@ private:
     std::array<float, kRing> ringIn {}, ringOut {};
     std::atomic<int> ringWrite { 0 };
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FreeFilterProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LibreFilterProcessor)
 };

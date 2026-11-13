@@ -1,4 +1,4 @@
-// FreeFilter: nucleo DSP (sin dependencias de JUCE).
+// LibreFilter: nucleo DSP (sin dependencias de JUCE).
 //
 // Modelo deducido del analisis del plugin original y verificado contra el (ver docs/ANALISIS.md):
 //
@@ -22,7 +22,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace ff
+namespace lf
 {
 constexpr int kBands = 30;
 constexpr double kPi = 3.14159265358979323846;
@@ -354,4 +354,4 @@ private:
     int pos = 0;
 };
 
-} // namespace ff
+} // namespace lf

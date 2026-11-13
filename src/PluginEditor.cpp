@@ -1,17 +1,10 @@
 #include "PluginEditor.h"
 #include "EditorLayout.h"
 
-using namespace ffl;
+using namespace lfl;
 
 namespace
 {
-    // Paleta LibreFilter (pack grafico)
-    const juce::Colour textLight  { 0xfff2f8ff };
-    const juce::Colour textDark   { 0xff0e2a4a };
-    const juce::Colour boxFill    { 0xff010510 };
-    const juce::Colour boxLine    { 0xff7ed0ff };
-    const juce::Colour gridLine   { 0xff2b3f5c };
-
     juce::Font uiFont (float h, bool bold = false, bool italic = false)
     {
         int style = juce::Font::plain;
@@ -27,7 +20,7 @@ namespace
 }
 
 //==============================================================================
-FreeFilterEditor::FreeFilterEditor (FreeFilterProcessor& p)
+LibreFilterEditor::LibreFilterEditor (LibreFilterProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
     for (int i = 0; i < kFftSize; ++i)
@@ -45,44 +38,42 @@ FreeFilterEditor::FreeFilterEditor (FreeFilterProcessor& p)
     presetName.setMultiLine (false);
     presetName.setReturnKeyStartsNewLine (false);
     presetName.setScrollbarsShown (false);
-    presetName.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff061426));
-    presetName.setColour (juce::TextEditor::textColourId, textLight);
-    presetName.setColour (juce::TextEditor::outlineColourId, boxLine.withAlpha (0.45f));
-    presetName.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colour (0xff3df0ff));
-    presetName.setColour (juce::TextEditor::highlightColourId, juce::Colour (0xff1e5fb4));
-    presetName.setTextToShowWhenEmpty ("preset name", juce::Colour (0xff7f95ad));
-    presetName.setIndents (8, 0);
+    presetName.setIndents (12, 0);
     presetName.setInputRestrictions (40);
-    addAndMakeVisible (presetName);
+    presetName.onReturnKey = [this] { endNameEdit (true); };
+    presetName.onEscapeKey = [this] { endNameEdit (false); };
+    presetName.onFocusLost = [this] { if (editingName) endNameEdit (true); };
+    addChildComponent (presetName);
+    applyTheme (processor.isRedTheme());
     refreshPresets();
 
     startTimerHz (30);
 }
 
-FreeFilterEditor::~FreeFilterEditor() { stopTimer(); }
+LibreFilterEditor::~LibreFilterEditor() { stopTimer(); setLookAndFeel (nullptr); }
 
-juce::AffineTransform FreeFilterEditor::designToScreen() const
+juce::AffineTransform LibreFilterEditor::designToScreen() const
 {
     return juce::AffineTransform::scale ((float) getWidth() / designW, (float) getHeight() / designH);
 }
 
-juce::Point<float> FreeFilterEditor::toDesign (juce::Point<float> p) const
+juce::Point<float> LibreFilterEditor::toDesign (juce::Point<float> p) const
 {
     return p.transformedBy (designToScreen().inverted());
 }
 
-bool FreeFilterEditor::isLogAxis() const
+bool LibreFilterEditor::isLogAxis() const
 {
     return processor.isThirdOctave();   // Log = tercios de octava, Lin = bandas iguales
 }
 
-void FreeFilterEditor::setStatus (const juce::String& s)
+void LibreFilterEditor::setStatus (const juce::String& s)
 {
     statusText = s;
     statusUntil = juce::Time::currentTimeMillis() + 3500;
 }
 
-juce::String FreeFilterEditor::idleStatus() const
+juce::String LibreFilterEditor::idleStatus() const
 {
     const bool d = processor.learnedFrames (true) > 0, s = processor.learnedFrames (false) > 0;
     if (processor.isLearnOn()) return processor.isLearnDest() ? "Learning destination..." : "Learning source...";
@@ -92,19 +83,19 @@ juce::String FreeFilterEditor::idleStatus() const
     return {};
 }
 
-void FreeFilterEditor::setMorphFromX (float x)
+void LibreFilterEditor::setMorphFromX (float x)
 {
     const float t = juce::jlimit (0.0f, 1.0f, (x - morphBar.getX()) / morphBar.getWidth());
     if (auto* p = processor.apvts.getParameter ("morph"))
         p->setValueNotifyingHost (p->convertTo0to1 (t * 200.0f));
 }
 
-float FreeFilterEditor::axisMax() const
+float LibreFilterEditor::axisMax() const
 {
     return juce::jmin (24000.0f, (float) processor.getSampleRate_() * 0.5f);   // mismo maximo en Lin y Log
 }
 
-float FreeFilterEditor::freqToX (float hz) const
+float LibreFilterEditor::freqToX (float hz) const
 {
     const float hi = axisMax();
     if (isLogAxis())
@@ -116,7 +107,7 @@ float FreeFilterEditor::freqToX (float hz) const
     return plotRect.getX() + juce::jlimit (0.0f, 1.0f, hz / hi) * plotRect.getWidth();
 }
 
-float FreeFilterEditor::xToFreq (float x) const
+float LibreFilterEditor::xToFreq (float x) const
 {
     const float hi = axisMax();
     const float t = juce::jlimit (0.0f, 1.0f, (x - plotRect.getX()) / plotRect.getWidth());
@@ -128,23 +119,23 @@ float FreeFilterEditor::xToFreq (float x) const
     return t * hi;
 }
 
-float FreeFilterEditor::dbToY (float db) const
+float LibreFilterEditor::dbToY (float db) const
 {
     return plotRect.getY() + (dbTop - juce::jlimit (dbBottom, dbTop, db)) / (dbTop - dbBottom) * plotRect.getHeight();
 }
 
-int FreeFilterEditor::bandAt (float x) const
+int LibreFilterEditor::bandAt (float x) const
 {
-    return juce::jlimit (0, ff::kBands - 1, (int) std::floor ((x - boardRect.getX()) / bandW));
+    return juce::jlimit (0, lf::kBands - 1, (int) std::floor ((x - boardRect.getX()) / bandW));
 }
 
-float FreeFilterEditor::valueAt (float y) const
+float LibreFilterEditor::valueAt (float y) const
 {
     const float t = juce::jlimit (0.0f, 1.0f, (y - boardRect.getY()) / boardRect.getHeight());
     return 15.0f - t * 30.0f;
 }
 
-void FreeFilterEditor::setBand (int b, float dB)
+void LibreFilterEditor::setBand (int b, float dB)
 {
     if (auto* prm = processor.apvts.getParameter (processor.activeBandId (b)))
     {
@@ -153,13 +144,13 @@ void FreeFilterEditor::setBand (int b, float dB)
     }
 }
 
-void FreeFilterEditor::resetAll() { processor.requestReset(); clearLeds(); }
+void LibreFilterEditor::resetAll() { processor.requestReset(); clearLeds(); }
 
 //==============================================================================
-void FreeFilterEditor::resized() { rebuildBackground(); layoutPresetEditor(); }
+void LibreFilterEditor::resized() { rebuildBackground(); layoutPresetEditor(); }
 
 // Parte estatica de la interfaz (panel, marcos, pistas de los sliders), dibujada una vez por tamano.
-void FreeFilterEditor::rebuildBackground()
+void LibreFilterEditor::rebuildBackground()
 {
     const float scale = juce::Component::getApproximateScaleFactorForComponent (this);
     const int pw = juce::jmax (1, juce::roundToInt (getWidth() * scale));
@@ -167,7 +158,7 @@ void FreeFilterEditor::rebuildBackground()
     background = juce::Image (juce::Image::RGB, pw, ph, true);
     juce::Graphics g (background);
 
-    g.fillAll (juce::Colour (0xff030c1a));
+    g.fillAll (pal.panelDark);
     skin.drawBackground (g, { 0.0f, 0.0f, (float) pw, (float) ph });
 
     g.addTransform (juce::AffineTransform::scale ((float) pw / designW, (float) ph / designH));
@@ -186,27 +177,27 @@ void FreeFilterEditor::rebuildBackground()
     g.fillRect (plotRect);
 
     // tablero de sliders
-    g.setColour (juce::Colour (0xff071428));
+    g.setColour (pal.bed);
     g.fillRoundedRectangle (boardRect.expanded (10.0f, 12.0f), 10.0f);
-    g.setColour (juce::Colour (0xff3da8ff).withAlpha (0.55f));
+    g.setColour (pal.bedEdge.withAlpha (0.55f));
     g.drawRoundedRectangle (boardRect.expanded (10.0f, 12.0f), 10.0f, 2.0f);
-    for (int b = 0; b < ff::kBands; ++b)
+    for (int b = 0; b < lf::kBands; ++b)
         skin.drawSliderTrack (g, { boardRect.getX() + (float) b * bandW + 2.0f, boardRect.getY(), bandW - 4.0f, boardRect.getHeight() });
 }
 
-void FreeFilterEditor::drawButton (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool on, bool enabled)
+void LibreFilterEditor::drawButton (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool on, bool enabled)
 {
     const auto state = ! enabled ? LibreSkin::ButtonState::disabled
                                  : on ? LibreSkin::ButtonState::active : LibreSkin::ButtonState::normal;
     skin.drawButton (g, r, state);
     if (text.isEmpty()) return;
 
-    g.setColour (! enabled ? juce::Colour (0xff2b4461) : on ? juce::Colour (0xff04200c) : textDark);
+    g.setColour (! enabled ? juce::Colour (0xff2b4461) : on ? juce::Colour (0xff04200c) : pal.textDark);
     g.setFont (uiFont (r.getHeight() * 0.44f, true));
     g.drawText (text, r.reduced (4.0f, 0.0f), juce::Justification::centred, false);
 }
 
-void FreeFilterEditor::paintButtons (juce::Graphics& g)
+void LibreFilterEditor::paintButtons (juce::Graphics& g)
 {
     // fila superior: Source/Dest (selector), Learn y Match
     drawButton (g, buttonRect (Source), "Source", ! processor.isLearnDest());
@@ -225,7 +216,7 @@ void FreeFilterEditor::paintButtons (juce::Graphics& g)
     {
         const auto r = buttonRect (ModeFree + i);
         drawButton (g, r, "", drawMode == modes[i]);
-        g.setColour (juce::Colour (0xff04200c).interpolatedWith (textDark, drawMode == modes[i] ? 0.0f : 1.0f));
+        g.setColour (juce::Colour (0xff04200c).interpolatedWith (pal.textDark, drawMode == modes[i] ? 0.0f : 1.0f));
         juce::Path p;
         const auto c = r.reduced (16.0f, 12.0f);
         const float lw = 3.2f;
@@ -247,7 +238,7 @@ void FreeFilterEditor::paintButtons (juce::Graphics& g)
         }
     }
 
-    g.setColour (textLight);
+    g.setColour (pal.textLight);
     g.setFont (uiFont (24.0f, true));
     g.drawText ("Global", globalLabel, juce::Justification::centredRight, false);
 
@@ -258,17 +249,17 @@ void FreeFilterEditor::paintButtons (juce::Graphics& g)
     drawButton (g, buttonRect (Log),    "Log",    isLogAxis());
 }
 
-void FreeFilterEditor::paintBands (juce::Graphics& g)
+void LibreFilterEditor::paintBands (juce::Graphics& g)
 {
     const float cy = boardRect.getCentreY();
-    for (int b = 0; b < ff::kBands; ++b)
+    for (int b = 0; b < lf::kBands; ++b)
     {
         const float x = boardRect.getX() + (float) b * bandW;
         const float v = processor.getBandValue (b);
         const float vy = boardRect.getY() + (15.0f - v) / 30.0f * boardRect.getHeight();
 
         // relleno desde 0 dB hasta el valor
-        g.setColour (juce::Colour (0xff2aa8ff).withAlpha (0.45f));
+        g.setColour (pal.sliderFill.withAlpha (0.45f));
         g.fillRect (x + 5.0f, juce::jmin (vy, cy), bandW - 10.0f, std::abs (vy - cy));
 
         // marcador de valor
@@ -284,7 +275,7 @@ void FreeFilterEditor::paintBands (juce::Graphics& g)
 
     // escala dB a la derecha
     g.setFont (uiFont (21.0f, true));
-    g.setColour (textLight);
+    g.setColour (pal.textLight);
     g.drawText ("dB", boardScale, juce::Justification::centredLeft, false);
     const int marks[7] = { 15, 10, 5, 0, -5, -10, -15 };
     for (int m : marks)
@@ -295,22 +286,22 @@ void FreeFilterEditor::paintBands (juce::Graphics& g)
     }
 
     // cuadro de valor
-    g.setColour (boxFill);
+    g.setColour (pal.boxFill);
     g.fillRoundedRectangle (valueBox, 4.0f);
-    g.setColour (boxLine.withAlpha (0.7f));
+    g.setColour (pal.boxLine.withAlpha (0.7f));
     g.drawRoundedRectangle (valueBox, 4.0f, 2.0f);
-    g.setColour (textLight);
+    g.setColour (pal.textLight);
     g.setFont (uiFont (25.0f, true));
     g.drawText (readDb, valueBox, juce::Justification::centred, false);
 }
 
-void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
+void LibreFilterEditor::paintAnalyzer (juce::Graphics& g)
 {
     g.saveState();
     g.reduceClipRegion (plotRect.toNearestInt());
 
     // rejilla
-    g.setColour (gridLine);
+    g.setColour (pal.gridLine);
     for (int d = -80; d <= 20; d += 20)
         g.drawHorizontalLine ((int) dbToY ((float) d), plotRect.getX(), plotRect.getRight());
     const float nyq = (float) processor.getSampleRate_() * 0.5f;
@@ -362,14 +353,14 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
 
     // etiquetas
     g.setFont (uiFont (21.0f, true));
-    g.setColour (textLight);
+    g.setColour (pal.textLight);
     g.drawText ("dB", juce::Rectangle<float> (scaleColumn.getX() + 8.0f, plotRect.getY() - 2.0f, 62.0f, 26.0f), juce::Justification::centredLeft, false);
     for (int d = 0; d >= -60; d -= 20)   // el +20 y el -80 quedan para las etiquetas 'dB' y 'kHz'
         g.drawText (juce::String (d), juce::Rectangle<float> (scaleColumn.getX() + 8.0f, dbToY ((float) d) - 13.0f, 62.0f, 26.0f),
                     juce::Justification::centredLeft, false);
     const float axisY = plotRect.getBottom() - 28.0f;
     g.drawText ("kHz", juce::Rectangle<float> (scaleColumn.getX() + 8.0f, axisY, 62.0f, 26.0f), juce::Justification::centredLeft, false);
-    g.setColour (textLight.withAlpha (0.65f));
+    g.setColour (pal.textLight.withAlpha (0.65f));
     if (isLogAxis())
     {
         for (float f : { 100.0f, 1000.0f, 10000.0f })
@@ -396,7 +387,7 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
     }
 }
 
-void FreeFilterEditor::paint (juce::Graphics& g)
+void LibreFilterEditor::paint (juce::Graphics& g)
 {
     g.drawImage (background, getLocalBounds().toFloat());
     if (showAbout) { paintAbout (g); return; }
@@ -405,7 +396,7 @@ void FreeFilterEditor::paint (juce::Graphics& g)
 
     // fila de lecturas (Morph / Hz / dB)
     {
-        g.setColour (textLight);
+        g.setColour (pal.textLight);
         g.setFont (uiFont (23.0f, true));
         g.drawText ("Morph %", morphLabel, juce::Justification::centredRight, false);
         g.drawText ("Hz", hzLabel, juce::Justification::centredRight, false);
@@ -413,22 +404,22 @@ void FreeFilterEditor::paint (juce::Graphics& g)
 
         auto box = [&] (juce::Rectangle<float> r, const juce::String& txt, bool dim)
         {
-            g.setColour (boxFill);
+            g.setColour (pal.boxFill);
             g.fillRoundedRectangle (r, 4.0f);
-            g.setColour (boxLine.withAlpha (0.7f));
+            g.setColour (pal.boxLine.withAlpha (0.7f));
             g.drawRoundedRectangle (r, 4.0f, 2.0f);
-            g.setColour (textLight.withAlpha (dim ? 0.4f : 1.0f));
+            g.setColour (pal.textLight.withAlpha (dim ? 0.4f : 1.0f));
             g.setFont (uiFont (25.0f, true));
             g.drawText (txt, r, juce::Justification::centred, false);
         };
         // Morph 0..200 %
         const float morphPct = processor.apvts.getRawParameterValue ("morph")->load();
         const bool morphOn = processor.isMatchOn();
-        g.setColour (juce::Colour (0xff0a1424));
+        g.setColour (pal.morphBg);
         g.fillRect (morphBar);
-        g.setColour (juce::Colour (morphOn ? 0xff6aa6e8 : 0xff4a5f7a));
+        g.setColour (morphOn ? pal.morphOn : pal.morphOff);
         g.fillRect (morphBar.withWidth (morphBar.getWidth() * morphPct / 200.0f));
-        g.setColour (boxLine.withAlpha (0.5f));
+        g.setColour (pal.boxLine.withAlpha (0.5f));
         g.drawRect (morphBar, 2.0f);
         g.drawVerticalLine ((int) (morphBar.getX() + morphBar.getWidth() * 0.5f), morphBar.getY(), morphBar.getBottom());
         box (morphBox, juce::String (juce::roundToInt (morphPct)), ! morphOn);
@@ -439,6 +430,7 @@ void FreeFilterEditor::paint (juce::Graphics& g)
     paintAnalyzer (g);
     paintBands (g);
     paintButtons (g);
+    paintPresetField (g);
 
     // estado (Learn/Match/presets): dentro del analizador, arriba a la izquierda
     {
@@ -446,18 +438,18 @@ void FreeFilterEditor::paint (juce::Graphics& g)
         if (msg.isNotEmpty())
         {
             g.setFont (uiFont (21.0f, false, true));
-            g.setColour (textLight.withAlpha (0.92f));
+            g.setColour (pal.textLight.withAlpha (0.92f));
             g.drawText (msg, statusRect, juce::Justification::centredLeft, false);
         }
     }
 
     // version bajo el credito (el logo del creador esta en el fondo)
-    g.setFont (uiFont (15.0f));
-    g.setColour (textLight.withAlpha (0.6f));
+    g.setFont (uiFont (13.0f));
+    g.setColour (pal.textLight.withAlpha (0.6f));
     g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
 }
 
-void FreeFilterEditor::paintAbout (juce::Graphics& g)
+void LibreFilterEditor::paintAbout (juce::Graphics& g)
 {
     skin.drawCredits (g, getLocalBounds().toFloat());
     g.addTransform (designToScreen());
@@ -465,13 +457,13 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
     skin.drawLogoPlugin (g, juce::Rectangle<float> (170.0f, 40.0f, 600.0f, 180.0f));
 
     const juce::Rectangle<float> panel (90.0f, 250.0f, 760.0f, 380.0f);
-    g.setColour (juce::Colour (0xff030c1a).withAlpha (0.55f));
+    g.setColour (pal.panelDark.withAlpha (0.55f));
     g.fillRoundedRectangle (panel, 18.0f);
-    g.setColour (boxLine.withAlpha (0.45f));
+    g.setColour (pal.boxLine.withAlpha (0.45f));
     g.drawRoundedRectangle (panel, 18.0f, 2.0f);
 
     g.setFont (uiFont (26.0f));
-    g.setColour (textLight);
+    g.setColour (pal.textLight);
     g.drawFittedText (juce::String::fromUTF8 (
                           "Algoritmo original: ME FreeFilter (Steinberg Mastering Edition)\n"
                           "\xC2\xA9 1998-2001 Spectral Design GmbH.\n\n"
@@ -483,8 +475,8 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
                       panel.reduced (24.0f).toNearestInt(), juce::Justification::centred, 12);
 
     skin.drawLogoCreator (g, juce::Rectangle<float> (0.0f, 0.0f, 320.0f, 70.0f).withCentre ({ designW * 0.5f, 720.0f }));
-    g.setFont (uiFont (15.0f));
-    g.setColour (textLight.withAlpha (0.6f));
+    g.setFont (uiFont (13.0f));
+    g.setColour (pal.textLight.withAlpha (0.6f));
     g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
 }
 
@@ -492,7 +484,7 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
 static juce::File presetsFolder()
 {
     auto dir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-                   .getChildFile ("FreeFilter").getChildFile ("Presets");
+                   .getChildFile ("LibreFilter").getChildFile ("Presets");
     dir.createDirectory();
     return dir;
 }
@@ -505,10 +497,10 @@ static juce::String sanitizeName (juce::String s)
     return out.trim();
 }
 
-void FreeFilterEditor::refreshPresets (const juce::String& selectName)
+void LibreFilterEditor::refreshPresets (const juce::String& selectName)
 {
     presetFiles.clear();
-    for (const auto& f : presetsFolder().findChildFiles (juce::File::findFiles, false, "*.ffcurve"))
+    for (const auto& f : presetsFolder().findChildFiles (juce::File::findFiles, false, "*.lfcurve"))
         presetFiles.push_back (f);
     std::sort (presetFiles.begin(), presetFiles.end(),
                [] (const juce::File& a, const juce::File& b) { return a.getFileNameWithoutExtension().compareIgnoreCase (b.getFileNameWithoutExtension()) < 0; });
@@ -519,13 +511,12 @@ void FreeFilterEditor::refreshPresets (const juce::String& selectName)
             if (presetFiles[i].getFileNameWithoutExtension() == selectName) presetIndex = (int) i;
 }
 
-// Recorre los presets y carga el elegido en el lado seleccionado (Source o Dest.).
-void FreeFilterEditor::presetStep (int delta)
+// Carga el preset 'index' en el lado seleccionado (Source o Dest.).
+void LibreFilterEditor::presetLoadIndex (int index)
 {
     refreshPresets();
-    if (presetFiles.empty()) { setStatus ("No presets yet. Learn a curve and press Save."); return; }
-    presetIndex = (presetIndex < 0 ? (delta > 0 ? 0 : (int) presetFiles.size() - 1)
-                                   : (presetIndex + delta + (int) presetFiles.size()) % (int) presetFiles.size());
+    if (index < 0 || index >= (int) presetFiles.size()) return;
+    presetIndex = index;
     const auto& f = presetFiles[(size_t) presetIndex];
     presetName.setText (f.getFileNameWithoutExtension(), false);
     const bool dest = processor.isLearnDest();
@@ -538,11 +529,21 @@ void FreeFilterEditor::presetStep (int delta)
         setStatus (msg);
     }
     else
-        setStatus ("Not a valid FreeFilter preset.");
+        setStatus ("Not a valid LibreFilter preset.");
+    repaint();
+}
+
+// Recorre los presets (flechas < y >).
+void LibreFilterEditor::presetStep (int delta)
+{
+    refreshPresets();
+    if (presetFiles.empty()) { setStatus ("No presets yet. Learn a curve and press Save."); return; }
+    presetLoadIndex (presetIndex < 0 ? (delta > 0 ? 0 : (int) presetFiles.size() - 1)
+                                     : (presetIndex + delta + (int) presetFiles.size()) % (int) presetFiles.size());
 }
 
 // Guarda la curva aprendida del lado seleccionado con el nombre escrito (o uno automatico).
-void FreeFilterEditor::presetSave()
+void LibreFilterEditor::presetSave()
 {
     const bool dest = processor.isLearnDest();
     if (processor.learnedFrames (dest) <= 0)
@@ -556,7 +557,7 @@ void FreeFilterEditor::presetSave()
         refreshPresets();
         name = juce::String (dest ? "Dest " : "Source ") + juce::String ((int) presetFiles.size() + 1).paddedLeft ('0', 2);
     }
-    const auto file = presetsFolder().getChildFile (name + ".ffcurve");
+    const auto file = presetsFolder().getChildFile (name + ".lfcurve");
     const bool existed = file.existsAsFile();
     if (processor.saveLearned (dest, file))
     {
@@ -569,7 +570,7 @@ void FreeFilterEditor::presetSave()
 }
 
 // Borrar pide una segunda pulsacion (3,5 s) para evitar accidentes; no hay dialogos.
-void FreeFilterEditor::presetDelete()
+void LibreFilterEditor::presetDelete()
 {
     if (presetIndex < 0 || presetIndex >= (int) presetFiles.size()) { setStatus ("No preset selected."); return; }
     const auto f = presetFiles[(size_t) presetIndex];
@@ -586,7 +587,105 @@ void FreeFilterEditor::presetDelete()
     presetName.setText (presetIndex >= 0 ? presetFiles[(size_t) presetIndex].getFileNameWithoutExtension() : juce::String(), false);
 }
 
-void FreeFilterEditor::layoutPresetEditor()
+// ---- tema (easter egg: clic en el logo del plugin) ----
+void LibreFilterEditor::applyTheme (bool red)
+{
+    redTheme = red;
+    skin.setRedTheme (red);
+    auto C = [] (juce::uint32 v) { return juce::Colour (v); };
+    if (! red)
+        pal = { C (0xfff2f8ff), C (0xff0e2a4a), C (0xff010510), C (0xff7ed0ff), C (0xff2b3f5c), C (0xff071428), C (0xff3da8ff),
+                C (0xff0a1424), C (0xff6aa6e8), C (0xff4a5f7a), C (0xff2aa8ff), C (0xff061426), C (0xff3df0ff), C (0xff1e5fb4),
+                C (0xff7f95ad), C (0xff030c1a), C (0xff071a30) };
+    else
+        pal = { C (0xfffff4f0), C (0xff3a1410), C (0xff120405), C (0xffff9a80), C (0xff5c2b2b), C (0xff2a0d0b), C (0xffff6a4a),
+                C (0xff240a0a), C (0xffe8806a), C (0xff7a4f4a), C (0xffff5a3a), C (0xff220807), C (0xffffb060), C (0xffb4361e),
+                C (0xffad8f7f), C (0xff1a0605), C (0xff300d0a) };
+
+    presetName.setColour (juce::TextEditor::backgroundColourId, pal.field);
+    presetName.setColour (juce::TextEditor::textColourId, pal.textLight);
+    presetName.setColour (juce::TextEditor::outlineColourId, pal.boxLine.withAlpha (0.45f));
+    presetName.setColour (juce::TextEditor::focusedOutlineColourId, pal.focus);
+    presetName.setColour (juce::TextEditor::highlightColourId, pal.highlight);
+    presetName.setColour (juce::CaretComponent::caretColourId, pal.textLight);
+
+    menuLaf.setColour (juce::PopupMenu::backgroundColourId, pal.menuBg);
+    menuLaf.setColour (juce::PopupMenu::textColourId, pal.textLight);
+    menuLaf.setColour (juce::PopupMenu::headerTextColourId, pal.hint);
+    menuLaf.setColour (juce::PopupMenu::highlightedBackgroundColourId, pal.highlight);
+    menuLaf.setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
+
+    processor.setRedTheme (red);
+    if (getWidth() > 0) rebuildBackground();
+    repaint();
+}
+
+// ---- caja de presets: desplegable ----
+void LibreFilterEditor::paintPresetField (juce::Graphics& g)
+{
+    const auto r = presetField;
+    g.setColour (pal.field);
+    g.fillRoundedRectangle (r, 6.0f);
+    g.setColour (pal.boxLine.withAlpha (0.45f));
+    g.drawRoundedRectangle (r, 6.0f, 1.5f);
+    if (editingName) return;                          // el campo de texto la tapa
+
+    const auto name = presetName.getText();
+    g.setFont (uiFont (r.getHeight() * 0.50f));
+    g.setColour (name.isEmpty() ? pal.hint : pal.textLight);
+    g.drawText (name.isEmpty() ? juce::String ("preset name") : name, r.reduced (14.0f, 0.0f).withTrimmedRight (26.0f),
+                juce::Justification::centredLeft, true);               // centrado en vertical
+
+    juce::Path arrow;                                  // triangulo del desplegable
+    const auto c = juce::Point<float> (r.getRight() - 20.0f, r.getCentreY());
+    arrow.addTriangle (c.x - 7.0f, c.y - 4.0f, c.x + 7.0f, c.y - 4.0f, c.x, c.y + 5.0f);
+    g.setColour (pal.textLight.withAlpha (0.8f));
+    g.fillPath (arrow);
+}
+
+void LibreFilterEditor::showPresetMenu()
+{
+    refreshPresets();
+    juce::PopupMenu m;
+    m.setLookAndFeel (&menuLaf);
+    if (presetFiles.empty())
+        m.addItem (-1, "(no presets yet)", false);
+    for (size_t i = 0; i < presetFiles.size(); ++i)
+        m.addItem (100 + (int) i, presetFiles[i].getFileNameWithoutExtension(), true, (int) i == presetIndex);
+    m.addSeparator();
+    m.addItem (1, "New name...");
+
+    const auto area = localAreaToGlobal (presetField.transformedBy (designToScreen()).toNearestInt());
+    juce::Component::SafePointer<LibreFilterEditor> safe (this);
+    m.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (area).withMinimumWidth (area.getWidth()).withMaximumNumColumns (1),
+                     [safe] (int id)
+                     {
+                         if (safe == nullptr) return;
+                         if (id == 1) safe->startNameEdit();
+                         else if (id >= 100) safe->presetLoadIndex (id - 100);
+                     });
+}
+
+void LibreFilterEditor::startNameEdit()
+{
+    editingName = true;
+    nameBeforeEdit = presetName.getText();
+    presetName.setText ({}, false);
+    presetName.setVisible (true);
+    presetName.grabKeyboardFocus();
+    repaint();
+}
+
+void LibreFilterEditor::endNameEdit (bool commit)
+{
+    if (! editingName) return;
+    editingName = false;
+    if (! commit || presetName.getText().trim().isEmpty()) presetName.setText (nameBeforeEdit, false);
+    presetName.setVisible (false);
+    repaint();
+}
+
+void LibreFilterEditor::layoutPresetEditor()
 {
     const auto r = presetField.transformedBy (designToScreen()).toNearestInt();
     presetName.setBounds (r);
@@ -594,7 +693,7 @@ void FreeFilterEditor::layoutPresetEditor()
 }
 
 //==============================================================================
-void FreeFilterEditor::timerCallback()
+void LibreFilterEditor::timerCallback()
 {
     const bool frozen = processor.apvts.getRawParameterValue ("freeze")->load() > 0.5f;
     if (! frozen)
@@ -618,7 +717,7 @@ void FreeFilterEditor::timerCallback()
 }
 
 //==============================================================================
-void FreeFilterEditor::mouseMove (const juce::MouseEvent& e)
+void LibreFilterEditor::mouseMove (const juce::MouseEvent& e)
 {
     hover = toDesign (e.position);
     readHz.clear();
@@ -626,7 +725,7 @@ void FreeFilterEditor::mouseMove (const juce::MouseEvent& e)
     if (boardRect.expanded (0.0f, 16.0f).contains (hover))
     {
         const int b = bandAt (hover.x);
-        const float centre = processor.isThirdOctave() ? (float) ff::kThirdOctave[b]
+        const float centre = processor.isThirdOctave() ? (float) lf::kThirdOctave[b]
                                                        : (float) ((b + 0.5) * processor.getSampleRate_() / 60.0);
         readHz = formatHz (centre);
         readDb = juce::String (processor.getBandValue (b), 1);
@@ -639,12 +738,15 @@ void FreeFilterEditor::mouseMove (const juce::MouseEvent& e)
     }
 }
 
-void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
+void LibreFilterEditor::mouseDown (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
 
-    if (showAbout) { showAbout = false; presetName.setVisible (true); repaint(); return; }
-    if (aboutRect.contains (p)) { showAbout = true; presetName.setVisible (false); repaint(); return; }
+    if (showAbout) { showAbout = false; repaint(); return; }
+    if (editingName && ! presetField.contains (p)) endNameEdit (true);
+    if (logoRect.contains (p)) { applyTheme (! redTheme); return; }                    // easter egg
+    if (creatorRect.contains (p)) { endNameEdit (true); showAbout = true; repaint(); return; }
+    if (presetField.contains (p) && ! editingName) { showPresetMenu(); return; }
 
     // botones
     for (int id = 0; id < NumButtons; ++id)
@@ -705,12 +807,12 @@ void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
         lastBand = -1;
         draggingBoard = true;
         clearLeds();
-        for (int b = 0; b < ff::kBands; ++b) startValues[(size_t) b] = processor.getBandValue (b);
+        for (int b = 0; b < lf::kBands; ++b) startValues[(size_t) b] = processor.getBandValue (b);
         mouseDrag (e);
     }
 }
 
-void FreeFilterEditor::mouseDrag (const juce::MouseEvent& e)
+void LibreFilterEditor::mouseDrag (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
     if (morphDragging) { setMorphFromX (p.x); return; }
@@ -738,7 +840,7 @@ void FreeFilterEditor::mouseDrag (const juce::MouseEvent& e)
             break;
         }
         case DrawMode::level:
-            for (int i = 0; i < ff::kBands; ++i) setBand (i, v);
+            for (int i = 0; i < lf::kBands; ++i) setBand (i, v);
             break;
         case DrawMode::line:
         {
@@ -770,7 +872,7 @@ void FreeFilterEditor::mouseDrag (const juce::MouseEvent& e)
     mouseMove (e);
 }
 
-void FreeFilterEditor::mouseUp (const juce::MouseEvent&)
+void LibreFilterEditor::mouseUp (const juce::MouseEvent&)
 {
     for (int b : touched)
         if (auto* prm = processor.apvts.getParameter (processor.activeBandId (b)))
@@ -781,13 +883,13 @@ void FreeFilterEditor::mouseUp (const juce::MouseEvent&)
     morphDragging = false;
 }
 
-void FreeFilterEditor::mouseDoubleClick (const juce::MouseEvent& e)
+void LibreFilterEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
     if (! boardRect.expanded (0.0f, 12.0f).contains (p)) return;
     clearLeds();
     if (drawMode == DrawMode::level)          // solo los sliders; lo aprendido y Match no se tocan (eso es Reset)
-        for (int i = 0; i < ff::kBands; ++i) setBand (i, 0.0f);
+        for (int i = 0; i < lf::kBands; ++i) setBand (i, 0.0f);
     else
     {
         setBand (bandAt (p.x), 0.0f);

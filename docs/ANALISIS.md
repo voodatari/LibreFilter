@@ -76,3 +76,20 @@ Hay 30 indicadores (uno por banda), creados como botones de mapa de bits **desha
   los marcadores de los sliders alternan igual (azul/rojo). No depende del estado. Hay un par de mapas de 9×9 por color
   (encendido / apagado): recursos 109/110 (morado) y 150/151 (rojo).
 * No se ejecutó la DLL (exige licencia de Mastering Edition); la conclusión sale de leer el código y los recursos.
+
+## Verificación de la salida frente a la DLL original (v1.3.2)
+
+Método: host de 32 bits propio que carga `ME FreeFilter WL.dll` (licencia de Mastering Edition en el registro del
+equipo, sin parchear nada), procesa 131 072 muestras de ruido gaussiano y vuelca la salida; el plugin nuevo procesa el
+mismo ruido y se comparan muestra a muestra tras alinear el retardo (896 original frente a 128 aquí: 768 de diferencia).
+
+* El original es lineal e invariante en el tiempo (desplazar la entrada no cambia la salida, error 1·10⁻⁵).
+* **Lin:** ganancia media orig/nuevo −0,0004 dB y diferencia de módulo ≤ 0,0006 dB de 20 Hz a 20 kHz. En la banda de
+  Nyquist (≳ 20 kHz a 44,1 kHz) el original se separa hasta 0,13 dB con sliders extremos (±15 dB alternos); en la
+  salida eso da un error relativo de −47 dB en el peor caso (−54…−58 dB con sliders aleatorios, −85 dB con todo plano).
+  No se ha explicado esa diferencia en el último medio kilohercio; es anterior a la versión 1.3 (el DSP no cambió).
+* **Match** (Morph 50 %, 100 %, 150 %, con sliders de Match): −63…−72 dB de error relativo.
+* **Log:** solo se compara por respuesta en las bandas altas (≳ 2 kHz, ver arriba); las graves siguen siendo un diseño
+  ideal, no una copia comprobada.
+* Regresión frente a v1.2.1: Lin y Match **idénticos bit a bit**; Log igual salvo +256 muestras de retardo (error
+  relativo 2,6·10⁻⁷, redondeo en coma flotante).

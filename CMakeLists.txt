@@ -5,7 +5,7 @@ if(POLICY CMP0141)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
 endif()
 
-project(FreeFilter VERSION 1.3.0 LANGUAGES C CXX)
+project(LibreFilter VERSION 1.3.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,22 +33,22 @@ FetchContent_Declare(
     GIT_SHALLOW    ON)
 FetchContent_MakeAvailable(JUCE)
 
-juce_add_plugin(FreeFilter
+juce_add_plugin(LibreFilter
     COMPANY_NAME                "VooD"
     PLUGIN_MANUFACTURER_CODE    Vood
-    PLUGIN_CODE                 FrFl
+    PLUGIN_CODE                 LiFl
     FORMATS                     VST3 AU Standalone
-    PRODUCT_NAME                "FreeFilter"
+    PRODUCT_NAME                "LibreFilter"
     IS_SYNTH                    FALSE
     NEEDS_MIDI_INPUT            FALSE
     NEEDS_MIDI_OUTPUT           FALSE
     COPY_PLUGIN_AFTER_BUILD     FALSE
     VST3_CATEGORIES             Fx EQ
     AU_MAIN_TYPE                kAudioUnitType_Effect
-    BUNDLE_ID                   com.vood.freefilter)
+    BUNDLE_ID                   com.vood.librefilter)
 
 # Recursos graficos del pack LibreFilter, incrustados en el binario (BinaryData.h)
-juce_add_binary_data(FreeFilterAssets
+juce_add_binary_data(LibreFilterAssets
     SOURCES
         resources/librefilter/plugin_background.svg
         resources/librefilter/button_normal.svg
@@ -61,9 +61,9 @@ juce_add_binary_data(FreeFilterAssets
         resources/librefilter/credits_background.png
         resources/librefilter/logo_plugin.png
         resources/librefilter/logo_creator.png)
-set_target_properties(FreeFilterAssets PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(LibreFilterAssets PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_sources(FreeFilter PRIVATE
+target_sources(LibreFilter PRIVATE
     src/PluginProcessor.cpp
     src/PluginProcessor.h
     src/PluginEditor.cpp
@@ -71,17 +71,17 @@ target_sources(FreeFilter PRIVATE
     src/EditorLayout.h
     src/LibreSkin.cpp
     src/LibreSkin.h
-    src/FreeFilterDSP.h)
+    src/LibreFilterDSP.h)
 
-target_compile_definitions(FreeFilter PUBLIC
+target_compile_definitions(LibreFilter PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0)
 
-target_link_libraries(FreeFilter
+target_link_libraries(LibreFilter
     PRIVATE
-        FreeFilterAssets
+        LibreFilterAssets
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
