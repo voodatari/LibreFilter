@@ -94,7 +94,4 @@ cp -R "LibreFilter.vst3" ~/Library/Audio/Plug-Ins/VST3/
 
 El plugin original es software comercial de terceros (© Spectral Design GmbH / Steinberg). Este repositorio
 contiene **código propio**: ni la DLL original, ni código decompilado, ni sus mapas de bits se incluyen.
-Las ideas y algoritmos (interpolación, ventana Hann, FIR, espectros medios) no son material con copyright, pero
-el nombre y la imagen del producto original sí pueden estar protegidos: **no publiques ni vendas esto con el
-nombre del original** sin permiso. Por eso el proyecto se llama LibreFilter y no usa ni el nombre ni la imagen del
-original (el easter egg de tema rojo solo recuerda su paleta; no copia sus mapas de bits).
+Las ideas y algoritmos (interpolación, ventana Hann, FIR, espectros medios) no son material con copyright.
