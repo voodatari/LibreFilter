@@ -19,11 +19,14 @@ El filtro se dedujo analizando el plugin original y está contrastado contra él
 * **Presets de curvas aprendidas** (abajo a la izquierda, sin diálogos del sistema): escribe un nombre y pulsa
   **Save** para guardar la curva aprendida del lado seleccionado (Source o Dest.); **<** y **>** recorren los presets
   y cargan el elegido en ese mismo lado; **Del** borra el seleccionado (hay que pulsarlo dos veces). Los presets son
-  archivos `.ffcurve` en `Documentos/FreeFilter/Presets/` (puedes copiarlos entre equipos).
+  archivos `.ffcurve` en `Documentos/FreeFilter/Presets/` (puedes copiarlos entre equipos). Si un preset se guardó
+  a otra frecuencia de muestreo, al cargarlo el espectro se adapta por frecuencias (el aviso lo indica).
   Además, lo aprendido **persiste** al parar/arrancar la reproducción y se guarda dentro del proyecto del DAW.
 * **Analizador de espectro** de entrada (verde), salida (rojo) y curva del filtro (amarillo).
 * Modos de dibujo: libre, nivel y recta. Doble clic en un slider lo pone a 0 dB.
-  **Reset** pone todo a 0, borra lo aprendido y desactiva Learn/Match. **Freeze** congela el analizador.
+  **Reset** pone todo a 0, borra lo aprendido y desactiva Learn/Match (el doble clic en modo nivel solo pone los
+  sliders a 0). **Freeze** congela el analizador, el filtro actual (los sliders y Match no lo cambian) y el aprendizaje;
+  el audio sigue pasando por el filtro congelado.
 * Clic en el título → créditos.
 
 ## Compilar

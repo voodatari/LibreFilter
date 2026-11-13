@@ -291,6 +291,7 @@ void FreeFilterProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     auto& learner = mode == ff::Mode::Equal ? learnerEq : learnerTh;
 
     // ---- aprendizaje ----
+    const bool frozen = isFrozen();           // Freeze congela el filtro y el aprendizaje (y el analizador, en el editor)
     const bool learnOn = isLearnOn();
     const auto target = ! learnOn ? ff::SpectrumLearner::None
                                   : (isLearnDest() ? ff::SpectrumLearner::Dest : ff::SpectrumLearner::Source);
@@ -318,8 +319,9 @@ void FreeFilterProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     for (int b = 0; b < ff::kBands; ++b) cur[(size_t) b] = set[(size_t) b]->load();
     const float morph = apvts.getRawParameterValue ("morph")->load() / 100.0f;
 
-    const bool changed = ! haveSig || mode != lastSigMode || matchEffective != lastSigMatch
-                         || (matchEffective && (morph != lastSigMorph || snapVersion != lastSigSnap)) || cur != lastSigSliders;
+    bool changed = ! haveSig || mode != lastSigMode || matchEffective != lastSigMatch
+                   || (matchEffective && (morph != lastSigMorph || snapVersion != lastSigSnap)) || cur != lastSigSliders;
+    if (frozen && haveSig) changed = false;   // Freeze: se mantiene el filtro actual (un cambio de modo o un Reset si lo rehacen)
     if (changed)
     {
         DesignJob job;
@@ -364,12 +366,12 @@ void FreeFilterProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         for (int i = 0; i < n; ++i)
         {
             const float x = monoIn[(size_t) i];
-            if (learnerEq.advance (x) && learnOn)
+            if (learnerEq.advance (x) && learnOn && ! frozen)
             {
                 const juce::SpinLock::ScopedLockType sl (learnLock);
                 learnerEq.analyseFrame();
             }
-            if (learnerTh.advance (x) && learnOn)
+            if (learnerTh.advance (x) && learnOn && ! frozen)
             {
                 const juce::SpinLock::ScopedLockType sl (learnLock);
                 learnerTh.analyseFrame();
@@ -521,10 +523,30 @@ bool FreeFilterProcessor::saveLearned (bool dest, const juce::File& file)
     return root.writeTo (file);
 }
 
-bool FreeFilterProcessor::loadLearned (bool dest, const juce::File& file)
+// Pasa un espectro medio (bins uniformes hasta Nyquist) de una frecuencia de muestreo a otra, conservando las
+// frecuencias: el bin k nuevo esta en k*newSr/N Hz, que en el espectro antiguo es el bin k*newSr/oldSr.
+// Por encima del Nyquist antiguo no hay informacion: se repite el ultimo bin.
+static void remapSpectrum (std::vector<double>& v, double oldSr, double newSr)
+{
+    const size_t n = v.size();
+    if (n < 2) return;
+    const std::vector<double> src = v;
+    for (size_t k = 0; k < n; ++k)
+    {
+        const double pos = (double) k * newSr / oldSr;
+        if (pos >= (double) (n - 1)) { v[k] = src[n - 1]; continue; }
+        const size_t i0 = (size_t) pos;
+        const double t = pos - (double) i0;
+        v[k] = src[i0] * (1.0 - t) + src[i0 + 1] * t;
+    }
+}
+
+bool FreeFilterProcessor::loadLearned (bool dest, const juce::File& file, double* fileSampleRate)
 {
     auto xml = juce::XmlDocument::parse (file);
     if (xml == nullptr || ! xml->hasTagName ("FreeFilterCurve")) return false;
+    const double fileSr = xml->getDoubleAttribute ("sampleRate", 0.0);
+    if (fileSampleRate != nullptr) *fileSampleRate = fileSr;
 
     const int fe = xml->getIntAttribute ("framesEq", 0), ft = xml->getIntAttribute ("framesTh", 0);
     std::vector<double> eq, th;
@@ -533,6 +555,13 @@ bool FreeFilterProcessor::loadLearned (bool dest, const juce::File& file)
     const bool okE = fe > 0 && eqEl != nullptr && base64ToDoubles (eqEl->getAllSubText().trim(), (size_t) ff::kEqBins, eq);
     const bool okT = ft > 0 && thEl != nullptr && base64ToDoubles (thEl->getAllSubText().trim(), (size_t) ff::kThBins, th);
     if (! okE && ! okT) return false;
+
+    const double sr = currentSampleRate.load();
+    if (fileSr > 0.0 && std::abs (fileSr - sr) > 1.0)      // guardado a otra frecuencia de muestreo
+    {
+        if (okE) remapSpectrum (eq, fileSr, sr);
+        if (okT) remapSpectrum (th, fileSr, sr);
+    }
     importSide (dest, eq, th, okE ? fe : 0, okT ? ft : 0);
     return true;
 }

@@ -46,6 +46,7 @@ public:
 
     bool isThirdOctave() const { return apvts.getRawParameterValue ("thirds")->load() > 0.5f; }
     bool isMatchOn() const { return apvts.getRawParameterValue ("matchOn")->load() > 0.5f; }
+    bool isFrozen() const { return apvts.getRawParameterValue ("freeze")->load() > 0.5f; }
     bool isLearnOn() const { return apvts.getRawParameterValue ("learn")->load() > 0.5f; }
     bool isLearnDest() const { return apvts.getRawParameterValue ("learnDest")->load() > 0.5f; }
     juce::String activeBandId (int b) const { return isMatchOn() ? matchId (b) : bandId (b); }
@@ -62,7 +63,8 @@ public:
 
     // Curvas aprendidas: guardar / cargar el lado indicado (true = Dest, false = Source) en un archivo .ffcurve
     bool saveLearned (bool dest, const juce::File& file);
-    bool loadLearned (bool dest, const juce::File& file);
+    // Si el archivo se guardó a otra frecuencia de muestreo, el espectro se remapea por frecuencia (fileSampleRate lo devuelve).
+    bool loadLearned (bool dest, const juce::File& file, double* fileSampleRate = nullptr);
 
     juce::AudioProcessorValueTreeState apvts;
 

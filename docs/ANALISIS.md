@@ -59,7 +59,8 @@ Verificación con espectros sintéticos (A con +6/+10/−8 dB, B con +0/+4, Morp
 * **Interfaz** dibujada con vectores propios (el original usaba mapas de bits de Spectral Design).
 * **Modos de dibujo**: *dibujo libre*, *nivel* y *recta* según el comportamiento esperado; los nombres originales
   (*rubber band*, *niveau*, *bone*) no se han verificado.
-* **Freeze** congela el analizador (el original: "congela todo el plugin"; comportamiento exacto no verificado).
+* **Freeze** congela el analizador, el filtro actual y el aprendizaje (el original: "congela todo el plugin";
+  comportamiento exacto no verificado). Un cambio de modo Lin/Log o un Reset rehacen el filtro aunque esté activo.
 * En modo tercios, el aprendizaje usa bloques de 16384 muestras con avance 12288 (resolución fina), no los de
   1024/768 del modo de bandas iguales.
 * **Reset** pone todos los sliders a 0, borra lo aprendido y desactiva Learn y Match.

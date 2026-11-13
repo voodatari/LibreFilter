@@ -584,8 +584,16 @@ void FreeFilterEditor::presetStep (int delta)
     const auto& f = presetFiles[(size_t) presetIndex];
     presetName.setText (f.getFileNameWithoutExtension(), false);
     const bool dest = processor.isLearnDest();
-    setStatus (processor.loadLearned (dest, f) ? juce::String (dest ? "Dest. " : "Source ") + "loaded: " + f.getFileNameWithoutExtension()
-                                               : "Not a valid FreeFilter preset.");
+    double fileSr = 0.0;
+    if (processor.loadLearned (dest, f, &fileSr))
+    {
+        juce::String msg = juce::String (dest ? "Dest. " : "Source ") + "loaded: " + f.getFileNameWithoutExtension();
+        if (fileSr > 0.0 && std::abs (fileSr - processor.getSampleRate_()) > 1.0)
+            msg += " (adapted from " + juce::String (juce::roundToInt (fileSr)) + " Hz)";
+        setStatus (msg);
+    }
+    else
+        setStatus ("Not a valid FreeFilter preset.");
 }
 
 // Guarda la curva aprendida del lado seleccionado con el nombre escrito (o uno automatico).
@@ -791,9 +799,13 @@ void FreeFilterEditor::mouseDrag (const juce::MouseEvent& e)
             const int b0 = bandAt (dragStart.x);
             const float v0 = valueAt (dragStart.y);
             const int lo = juce::jmin (b0, b), hi = juce::jmax (b0, b);
+            // las bandas que ya no quedan bajo la recta vuelven al valor que tenian al empezar el arrastre
+            for (int i : std::vector<int> (touched.begin(), touched.end()))
+                if (i < lo || i > hi)
+                    setBand (i, startValues[(size_t) i]);
             for (int i = lo; i <= hi; ++i)
             {
-                const float t = hi == lo ? 1.0f : (float) (i - b0) / (float) (b - b0 == 0 ? 1 : (b - b0));
+                const float t = hi == lo ? 1.0f : (float) (i - b0) / (float) (b - b0);
                 setBand (i, v0 + t * (v - v0));
             }
             break;
@@ -818,8 +830,9 @@ void FreeFilterEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
     if (! boardRect.expanded (0.0f, 6.0f).contains (p)) return;
-    if (drawMode == DrawMode::level) { resetAll(); return; }
-    const int b = bandAt (p.x);
-    setBand (b, 0.0f);
+    if (drawMode == DrawMode::level)          // solo los sliders; lo aprendido y Match no se tocan (eso es Reset)
+        for (int i = 0; i < ff::kBands; ++i) setBand (i, 0.0f);
+    else
+        setBand (bandAt (p.x), 0.0f);
     mouseUp (e);
 }
