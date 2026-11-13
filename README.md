@@ -9,23 +9,6 @@ con GitHub Actions.
 El filtro se dedujo analizando el plugin original y está contrastado contra él (ver
 [docs/ANALISIS.md](docs/ANALISIS.md), con lo verificado y lo no verificado).
 
-## Aspecto (skin LibreFilter) y control de versiones
-
-El nombre interno es **LibreFilter** (clases, ID del plugin `com.vood.librefilter`, archivo `LibreFilter.vst3`, carpeta de presets `Documentos/LibreFilter/Presets`, extensión `.lfcurve`); no es compatible con los presets y proyectos de la etapa «FreeFilter». La interfaz usa el pack gráfico **LibreFilter** (`resources/librefilter/`, SVG/PNG incrustados con `juce_add_binary_data`).
-Solo cambia lo visual: parámetros, DSP y manejo del ratón son los mismos. La geometría está en `src/EditorLayout.h`
-(espacio de diseño 940 × 980) y el dibujo de los recursos en `src/LibreSkin.cpp`. Detalles de integración: JUCE no pinta
-los filtros de brillo, el patrón `grain` ni el degradado del texto de los SVG, así que `LibreSkin` preprocesa el XML al
-cargarlo (halos de capas en lugar de blur) y dibuja los logos con texto de JUCE. 
-
-Para volver al aspecto anterior (panel rojo, 454 × 417):
-
-```bash
-git switch main                    # la rama principal conserva el aspecto clásico (v1.2.1)
-git checkout skin-classic-v1.2.1   # o la etiqueta exacta del último commit con el aspecto clásico
-```
-
-La rama `skin-librefilter` contiene la skin nueva; `git switch skin-librefilter` vuelve a ella.
-
 ## Qué hace
 
 * **30 bandas** de ±15 dB, interpoladas en dB y realizadas como FIR lineal.
