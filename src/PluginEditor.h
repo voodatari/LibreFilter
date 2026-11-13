@@ -1,11 +1,13 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "LibreSkin.h"
+#include "EditorLayout.h"
 #include <juce_dsp/juce_dsp.h>
 #include <set>
 
-// Interfaz inspirada en la del original (panel rojo 454x417, analizador, 30 sliders, botones).
-// Todo se dibuja con vectores: no se usan los mapas de bits originales.
+// Interfaz LibreFilter (pack grafico 940x980: analizador, 30 sliders, botones).
+// Las imagenes salen de resources/librefilter (no se usan los mapas de bits del plugin original).
 class FreeFilterEditor : public juce::AudioProcessorEditor,
                          private juce::Timer
 {
@@ -22,7 +24,7 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
 
-    static constexpr int designW = 454, designH = 417;
+    static constexpr int designW = ffl::designW, designH = ffl::designH;
 
 private:
     enum class DrawMode { freehand, level, line };
@@ -71,6 +73,7 @@ private:
     void presetDelete();
     void layoutPresetEditor();
 
+    LibreSkin skin;
     juce::Image background;
     bool showAbout = false;
 

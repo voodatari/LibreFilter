@@ -1,43 +1,16 @@
 #include "PluginEditor.h"
+#include "EditorLayout.h"
+
+using namespace ffl;
 
 namespace
 {
-    // Geometría en el espacio de diseño 454 x 417
-    const juce::Rectangle<float> analyzerRect { 22.0f, 70.0f, 410.0f, 172.0f };
-    const juce::Rectangle<float> plotRect     { 28.0f, 76.0f, 360.0f, 160.0f };
-    const juce::Rectangle<float> boardRect    { 25.0f, 270.0f, 360.0f, 70.0f };
-    const juce::Rectangle<float> titleRect    { 200.0f, 8.0f, 245.0f, 26.0f };
-    const juce::Rectangle<float> aboutRect    { 318.0f, 8.0f, 127.0f, 26.0f };   // solo el texto "FreeFilter"; no pisa el boton Match
-    constexpr float bandW = 12.0f;
-    constexpr float dbTop = 20.0f, dbBottom = -80.0f;
-
-    const juce::Colour panelTop    { 0xffc2432f };
-    const juce::Colour panelBottom { 0xff8f2a1f };
-
-    enum ButtonId { Source, Dest, Learn, Match, ModeFree, ModeLevel, ModeLine, Reset, Freeze, Lin, Log, PresetPrev, PresetNext, PresetSave, PresetDel, NumButtons };
-
-    juce::Rectangle<float> buttonRect (int id)
-    {
-        switch (id)
-        {
-            case Source:    return { 28.0f, 10.0f, 40.0f, 17.0f };
-            case Dest:      return { 85.0f, 10.0f, 40.0f, 17.0f };
-            case Learn:     return { 143.0f, 10.0f, 40.0f, 17.0f };
-            case Match:     return { 199.0f, 10.0f, 40.0f, 17.0f };
-            case ModeFree:  return { 30.0f, 362.0f, 32.0f, 20.0f };
-            case ModeLevel: return { 67.0f, 362.0f, 32.0f, 20.0f };
-            case ModeLine:  return { 104.0f, 362.0f, 32.0f, 20.0f };
-            case Reset:     return { 192.0f, 362.0f, 40.0f, 18.0f };
-            case Freeze:    return { 242.0f, 362.0f, 40.0f, 18.0f };
-            case Lin:       return { 294.0f, 362.0f, 32.0f, 18.0f };
-            case Log:       return { 334.0f, 362.0f, 32.0f, 18.0f };
-            case PresetPrev: return { 28.0f, 388.0f, 16.0f, 16.0f };
-            case PresetNext: return { 204.0f, 388.0f, 16.0f, 16.0f };
-            case PresetSave: return { 226.0f, 388.0f, 34.0f, 16.0f };
-            case PresetDel:  return { 264.0f, 388.0f, 28.0f, 16.0f };
-            default:        return {};
-        }
-    }
+    // Paleta LibreFilter (pack grafico)
+    const juce::Colour textLight  { 0xfff2f8ff };
+    const juce::Colour textDark   { 0xff0e2a4a };
+    const juce::Colour boxFill    { 0xff010510 };
+    const juce::Colour boxLine    { 0xff7ed0ff };
+    const juce::Colour gridLine   { 0xff2b3f5c };
 
     juce::Font uiFont (float h, bool bold = false, bool italic = false)
     {
@@ -66,18 +39,19 @@ FreeFilterEditor::FreeFilterEditor (FreeFilterProcessor& p)
 
     setResizable (true, true);
     getConstrainer()->setFixedAspectRatio ((double) designW / designH);
-    setResizeLimits (designW, designH, designW * 3, designH * 3);
-    setSize (designW * 5 / 4, designH * 5 / 4);
+    setResizeLimits (designW / 2, designH / 2, designW * 2, designH * 2);
+    setSize (designW * 4 / 5, designH * 4 / 5);
 
     presetName.setMultiLine (false);
     presetName.setReturnKeyStartsNewLine (false);
     presetName.setScrollbarsShown (false);
-    presetName.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff0b0b12));
-    presetName.setColour (juce::TextEditor::textColourId, juce::Colours::white);
-    presetName.setColour (juce::TextEditor::outlineColourId, juce::Colours::white.withAlpha (0.4f));
-    presetName.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colour (0xff7be07b));
-    presetName.setTextToShowWhenEmpty ("preset name", juce::Colours::grey);
-    presetName.setIndents (4, 0);
+    presetName.setColour (juce::TextEditor::backgroundColourId, juce::Colour (0xff061426));
+    presetName.setColour (juce::TextEditor::textColourId, textLight);
+    presetName.setColour (juce::TextEditor::outlineColourId, boxLine.withAlpha (0.45f));
+    presetName.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colour (0xff3df0ff));
+    presetName.setColour (juce::TextEditor::highlightColourId, juce::Colour (0xff1e5fb4));
+    presetName.setTextToShowWhenEmpty ("preset name", juce::Colour (0xff7f95ad));
+    presetName.setIndents (8, 0);
     presetName.setInputRestrictions (40);
     addAndMakeVisible (presetName);
     refreshPresets();
@@ -120,8 +94,7 @@ juce::String FreeFilterEditor::idleStatus() const
 
 void FreeFilterEditor::setMorphFromX (float x)
 {
-    const juce::Rectangle<float> bar (28.0f, 40.0f, 105.0f, 14.0f);
-    const float t = juce::jlimit (0.0f, 1.0f, (x - bar.getX()) / bar.getWidth());
+    const float t = juce::jlimit (0.0f, 1.0f, (x - morphBar.getX()) / morphBar.getWidth());
     if (auto* p = processor.apvts.getParameter ("morph"))
         p->setValueNotifyingHost (p->convertTo0to1 (t * 200.0f));
 }
@@ -185,6 +158,7 @@ void FreeFilterEditor::resetAll() { processor.requestReset(); }
 //==============================================================================
 void FreeFilterEditor::resized() { rebuildBackground(); layoutPresetEditor(); }
 
+// Parte estatica de la interfaz (panel, marcos, pistas de los sliders), dibujada una vez por tamano.
 void FreeFilterEditor::rebuildBackground()
 {
     const float scale = juce::Component::getApproximateScaleFactorForComponent (this);
@@ -193,39 +167,39 @@ void FreeFilterEditor::rebuildBackground()
     background = juce::Image (juce::Image::RGB, pw, ph, true);
     juce::Graphics g (background);
 
-    g.setGradientFill (juce::ColourGradient (panelTop, 0.0f, 0.0f, panelBottom, 0.0f, (float) ph, false));
-    g.fillAll();
+    g.fillAll (juce::Colour (0xff030c1a));
+    skin.drawBackground (g, { 0.0f, 0.0f, (float) pw, (float) ph });
 
-    // trama metálica fina y fija
-    juce::Random rng (0xF1F1);
-    for (int y = 0; y < ph; ++y)
-    {
-        const float a = rng.nextFloat();
-        g.setColour ((a > 0.5f ? juce::Colours::white : juce::Colours::black).withAlpha (0.015f + 0.05f * std::abs (a - 0.5f)));
-        g.drawHorizontalLine (y, 0.0f, (float) pw);
-    }
-    g.setColour (juce::Colours::white.withAlpha (0.35f));
-    g.drawRect (0, 0, pw, ph, 1);
-    g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.drawHorizontalLine (ph - 1, 0.0f, (float) pw);
-    g.drawVerticalLine (pw - 1, 0.0f, (float) ph);
+    g.addTransform (juce::AffineTransform::scale ((float) pw / designW, (float) ph / designH));
+
+    // fila de lecturas
+    g.setColour (juce::Colours::black.withAlpha (0.28f));
+    g.fillRoundedRectangle (stripRect, 8.0f);
+
+    // analizador: marco y fondo negro de la zona de curvas
+    skin.drawGraphFrame (g, analyzerRect);
+    g.setColour (juce::Colour (0xff01030a));
+    g.fillRect (plotRect);
+
+    // tablero de sliders
+    g.setColour (juce::Colour (0xff071428));
+    g.fillRoundedRectangle (boardRect.expanded (10.0f, 12.0f), 10.0f);
+    g.setColour (juce::Colour (0xff3da8ff).withAlpha (0.55f));
+    g.drawRoundedRectangle (boardRect.expanded (10.0f, 12.0f), 10.0f, 2.0f);
+    for (int b = 0; b < ff::kBands; ++b)
+        skin.drawSliderTrack (g, { boardRect.getX() + (float) b * bandW + 2.0f, boardRect.getY(), bandW - 4.0f, boardRect.getHeight() });
 }
 
 void FreeFilterEditor::drawButton (juce::Graphics& g, juce::Rectangle<float> r, const juce::String& text, bool on, bool enabled)
 {
-    g.setGradientFill (juce::ColourGradient (juce::Colour (on ? 0xff7be07b : 0xfff0f0f0), r.getX(), r.getY(),
-                                             juce::Colour (on ? 0xff2f9a35 : 0xffbdbdbd), r.getX(), r.getBottom(), false));
-    g.fillRoundedRectangle (r, 2.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.6f));
-    g.drawRoundedRectangle (r, 2.0f, 1.0f);
-    if (! enabled)
-    {
-        g.setColour (juce::Colour (0xffb04030).withAlpha (0.45f));
-        g.fillRoundedRectangle (r, 2.0f);
-    }
-    g.setColour (enabled ? juce::Colours::black : juce::Colours::black.withAlpha (0.4f));
-    g.setFont (uiFont (10.0f, true));
-    g.drawText (text, r, juce::Justification::centred, false);
+    const auto state = ! enabled ? LibreSkin::ButtonState::disabled
+                                 : on ? LibreSkin::ButtonState::active : LibreSkin::ButtonState::normal;
+    skin.drawButton (g, r, state);
+    if (text.isEmpty()) return;
+
+    g.setColour (! enabled ? juce::Colour (0xff2b4461) : on ? juce::Colour (0xff04200c) : textDark);
+    g.setFont (uiFont (r.getHeight() * 0.44f, true));
+    g.drawText (text, r.reduced (4.0f, 0.0f), juce::Justification::centred, false);
 }
 
 void FreeFilterEditor::paintButtons (juce::Graphics& g)
@@ -247,30 +221,31 @@ void FreeFilterEditor::paintButtons (juce::Graphics& g)
     {
         const auto r = buttonRect (ModeFree + i);
         drawButton (g, r, "", drawMode == modes[i]);
-        g.setColour (juce::Colours::black);
+        g.setColour (juce::Colour (0xff04200c).interpolatedWith (textDark, drawMode == modes[i] ? 0.0f : 1.0f));
         juce::Path p;
-        const auto c = r.reduced (6.0f, 5.0f);
+        const auto c = r.reduced (16.0f, 12.0f);
+        const float lw = 3.2f;
         if (i == 0)
         {
             p.startNewSubPath (c.getX(), c.getBottom());
-            p.cubicTo (c.getX() + c.getWidth() * 0.3f, c.getY() - 2, c.getX() + c.getWidth() * 0.6f, c.getBottom() + 2, c.getRight(), c.getY());
-            g.strokePath (p, juce::PathStrokeType (1.4f));
+            p.cubicTo (c.getX() + c.getWidth() * 0.3f, c.getY() - 5, c.getX() + c.getWidth() * 0.6f, c.getBottom() + 5, c.getRight(), c.getY());
+            g.strokePath (p, juce::PathStrokeType (lw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
         }
         else if (i == 1)
         {
-            g.drawLine (c.getX(), c.getCentreY(), c.getRight(), c.getCentreY(), 1.4f);
+            g.drawLine (c.getX(), c.getCentreY(), c.getRight(), c.getCentreY(), lw);
         }
         else
         {
-            g.drawLine (c.getX(), c.getBottom(), c.getRight(), c.getY(), 1.4f);
-            g.fillEllipse (c.getX() - 2, c.getBottom() - 2, 4, 4);
-            g.fillEllipse (c.getRight() - 2, c.getY() - 2, 4, 4);
+            g.drawLine (c.getX(), c.getBottom(), c.getRight(), c.getY(), lw);
+            g.fillEllipse (c.getX() - 4, c.getBottom() - 4, 8, 8);
+            g.fillEllipse (c.getRight() - 4, c.getY() - 4, 8, 8);
         }
     }
 
-    g.setColour (juce::Colours::white);
-    g.setFont (uiFont (11.0f, true));
-    g.drawText ("Global", juce::Rectangle<float> (146.0f, 362.0f, 44.0f, 18.0f), juce::Justification::centredRight, false);
+    g.setColour (textLight);
+    g.setFont (uiFont (24.0f, true));
+    g.drawText ("Global", globalLabel, juce::Justification::centredRight, false);
 
     const bool frozen = processor.apvts.getRawParameterValue ("freeze")->load() > 0.5f;
     drawButton (g, buttonRect (Reset),  "Reset",  false);
@@ -281,75 +256,57 @@ void FreeFilterEditor::paintButtons (juce::Graphics& g)
 
 void FreeFilterEditor::paintBands (juce::Graphics& g)
 {
-    // fondo oscuro de los sliders
-    g.setColour (juce::Colour (0xff1b1c20));
-    g.fillRoundedRectangle (boardRect.expanded (2.0f, 4.0f), 2.0f);
-
     const float cy = boardRect.getCentreY();
     for (int b = 0; b < ff::kBands; ++b)
     {
-        const float x = boardRect.getX() + b * bandW;
+        const float x = boardRect.getX() + (float) b * bandW;
         const float v = processor.getBandValue (b);
         const float vy = boardRect.getY() + (15.0f - v) / 30.0f * boardRect.getHeight();
 
-        g.setColour (juce::Colour (0xff3a3c44));
-        g.fillRect (x + 1.5f, boardRect.getY(), bandW - 3.0f, boardRect.getHeight());
-
         // relleno desde 0 dB hasta el valor
-        g.setColour (juce::Colour (0xff6d7fd8).withAlpha (0.55f));
-        g.fillRect (x + 1.5f, juce::jmin (vy, cy), bandW - 3.0f, std::abs (vy - cy));
+        g.setColour (juce::Colour (0xff2aa8ff).withAlpha (0.45f));
+        g.fillRect (x + 5.0f, juce::jmin (vy, cy), bandW - 10.0f, std::abs (vy - cy));
 
         // marcador de valor
-        g.setColour (juce::Colour (0xffe9e9ef));
-        g.fillRect (x + 1.0f, vy - 1.5f, bandW - 2.0f, 3.0f);
+        skin.drawSliderThumb (g, { x + 1.5f, vy - 7.0f, bandW - 3.0f, 14.0f });
 
         // "LED" superior
-        const bool active = std::abs (v) > 0.05f;
-        g.setColour (active ? juce::Colour (0xffd25cff) : juce::Colour (0xff5b3b86));
-        g.fillEllipse (x + 2.0f, boardRect.getY() - 9.0f, bandW - 4.0f, bandW - 4.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.7f));
-        g.drawEllipse (x + 2.0f, boardRect.getY() - 9.0f, bandW - 4.0f, bandW - 4.0f, 0.8f);
+        skin.drawLed (g, { x + (bandW - 20.0f) * 0.5f, boardRect.getY() - 28.0f, 20.0f, 20.0f }, std::abs (v) > 0.05f);
     }
 
-    // línea de 0 dB
-    g.setColour (juce::Colours::white.withAlpha (0.25f));
+    // linea de 0 dB
+    g.setColour (juce::Colours::white.withAlpha (0.22f));
     g.drawHorizontalLine ((int) cy, boardRect.getX(), boardRect.getRight());
 
     // escala dB a la derecha
-    g.setFont (uiFont (9.0f, true));
-    g.setColour (juce::Colours::white.withAlpha (0.9f));
+    g.setFont (uiFont (21.0f, true));
+    g.setColour (textLight);
+    g.drawText ("dB", boardScale, juce::Justification::centredLeft, false);
     const int marks[7] = { 15, 10, 5, 0, -5, -10, -15 };
-    g.drawText ("dB", juce::Rectangle<float> (394.0f, 254.0f, 30.0f, 12.0f), juce::Justification::centredLeft, false);
     for (int m : marks)
     {
         const float y = boardRect.getY() + (15.0f - (float) m) / 30.0f * boardRect.getHeight();
-        g.drawText (juce::String (m), juce::Rectangle<float> (396.0f, y - 6.0f, 28.0f, 12.0f), juce::Justification::centredLeft, false);
-        g.drawHorizontalLine ((int) y, 390.0f, 394.0f);
+        g.drawText (juce::String (m), juce::Rectangle<float> (scaleColumn.getX() + 8.0f, y - 12.0f, 62.0f, 24.0f), juce::Justification::centredLeft, false);
+        g.drawHorizontalLine ((int) y, boardRect.getRight() + 12.0f, boardRect.getRight() + 24.0f);
     }
 
     // cuadro de valor
-    const juce::Rectangle<float> box { 394.0f, 358.0f, 36.0f, 16.0f };
-    g.setColour (juce::Colour (0xff0b0b12));
-    g.fillRect (box);
-    g.setColour (juce::Colours::white.withAlpha (0.5f));
-    g.drawRect (box, 1.0f);
-    g.setColour (juce::Colours::white);
-    g.setFont (uiFont (10.0f, true));
-    g.drawText (readDb, box, juce::Justification::centred, false);
+    g.setColour (boxFill);
+    g.fillRoundedRectangle (valueBox, 4.0f);
+    g.setColour (boxLine.withAlpha (0.7f));
+    g.drawRoundedRectangle (valueBox, 4.0f, 2.0f);
+    g.setColour (textLight);
+    g.setFont (uiFont (25.0f, true));
+    g.drawText (readDb, valueBox, juce::Justification::centred, false);
 }
 
 void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
 {
-    g.setColour (juce::Colours::black);
-    g.fillRoundedRectangle (analyzerRect, 3.0f);
-    g.setColour (juce::Colours::white.withAlpha (0.35f));
-    g.drawRoundedRectangle (analyzerRect, 3.0f, 1.0f);
-
     g.saveState();
     g.reduceClipRegion (plotRect.toNearestInt());
 
     // rejilla
-    g.setColour (juce::Colours::white.withAlpha (0.10f));
+    g.setColour (gridLine);
     for (int d = -80; d <= 20; d += 20)
         g.drawHorizontalLine ((int) dbToY ((float) d), plotRect.getX(), plotRect.getRight());
     const float nyq = (float) processor.getSampleRate_() * 0.5f;
@@ -369,7 +326,7 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
     {
         juce::Path p;
         bool started = false;
-        for (float x = plotRect.getX(); x <= plotRect.getRight(); x += 1.0f)
+        for (float x = plotRect.getX(); x <= plotRect.getRight(); x += 1.5f)
         {
             const float f = xToFreq (x);
             const float bin = f / nyq * (float) (kFftSize / 2 - 1);
@@ -380,7 +337,7 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
             if (! started) { p.startNewSubPath (x, y); started = true; } else p.lineTo (x, y);
         }
         g.setColour (c);
-        g.strokePath (p, juce::PathStrokeType (1.0f));
+        g.strokePath (p, juce::PathStrokeType (2.0f));
     };
     drawSpec (specIn,  juce::Colour (0xff3cd23c));
     drawSpec (specOut, juce::Colour (0xffe53935));
@@ -389,48 +346,49 @@ void FreeFilterEditor::paintAnalyzer (juce::Graphics& g)
     {
         juce::Path p;
         bool started = false;
-        for (float x = plotRect.getX(); x <= plotRect.getRight(); x += 2.0f)
+        for (float x = plotRect.getX(); x <= plotRect.getRight(); x += 3.0f)
         {
             const float y = dbToY (processor.responseDbAt (xToFreq (x)));
             if (! started) { p.startNewSubPath (x, y); started = true; } else p.lineTo (x, y);
         }
-        g.setColour (juce::Colour (0xfff2c418));
-        g.strokePath (p, juce::PathStrokeType (1.4f));
+        g.setColour (juce::Colour (0xffffe600));
+        g.strokePath (p, juce::PathStrokeType (3.2f));
     }
     g.restoreState();
 
     // etiquetas
-    g.setFont (uiFont (9.0f, true));
-    g.setColour (juce::Colours::white.withAlpha (0.85f));
-    g.drawText ("dB", juce::Rectangle<float> (394.0f, 72.0f, 30.0f, 12.0f), juce::Justification::centredLeft, false);
+    g.setFont (uiFont (21.0f, true));
+    g.setColour (textLight);
+    g.drawText ("dB", juce::Rectangle<float> (scaleColumn.getX() + 8.0f, plotRect.getY() - 2.0f, 62.0f, 26.0f), juce::Justification::centredLeft, false);
     for (int d = 0; d >= -60; d -= 20)   // el +20 y el -80 quedan para las etiquetas 'dB' y 'kHz'
-        g.drawText (juce::String (d), juce::Rectangle<float> (394.0f, dbToY ((float) d) - 6.0f, 34.0f, 12.0f),
+        g.drawText (juce::String (d), juce::Rectangle<float> (scaleColumn.getX() + 8.0f, dbToY ((float) d) - 13.0f, 62.0f, 26.0f),
                     juce::Justification::centredLeft, false);
-    g.drawText ("kHz", juce::Rectangle<float> (394.0f, 224.0f, 30.0f, 12.0f), juce::Justification::centredLeft, false);
-    g.setColour (juce::Colours::white.withAlpha (0.55f));
+    const float axisY = plotRect.getBottom() - 28.0f;
+    g.drawText ("kHz", juce::Rectangle<float> (scaleColumn.getX() + 8.0f, axisY, 62.0f, 26.0f), juce::Justification::centredLeft, false);
+    g.setColour (textLight.withAlpha (0.65f));
     if (isLogAxis())
     {
         for (float f : { 100.0f, 1000.0f, 10000.0f })
             if (f < axMax)
-                g.drawText (juce::String (f / 1000.0f, f < 1000.0f ? 1 : 0), juce::Rectangle<float> (freqToX (f) + 2.0f, 224.0f, 30.0f, 12.0f),
+                g.drawText (juce::String (f / 1000.0f, f < 1000.0f ? 1 : 0), juce::Rectangle<float> (freqToX (f) + 4.0f, axisY, 60.0f, 26.0f),
                             juce::Justification::centredLeft, false);
     }
     else
     {
         for (float f = 5000.0f; f < axMax; f += 5000.0f)
-            g.drawText (juce::String (f / 1000.0f, 0), juce::Rectangle<float> (freqToX (f) + 2.0f, 224.0f, 30.0f, 12.0f),
+            g.drawText (juce::String (f / 1000.0f, 0), juce::Rectangle<float> (freqToX (f) + 4.0f, axisY, 60.0f, 26.0f),
                         juce::Justification::centredLeft, false);
     }
 
     // leyenda
-    g.setFont (uiFont (10.0f, true));
+    g.setFont (uiFont (22.0f, true));
     const struct { const char* name; juce::Colour c; float x; } legend[3] = {
-        { "Input", juce::Colour (0xff3cd23c), 138.0f }, { "Output", juce::Colour (0xffe53935), 196.0f }, { "Filter", juce::Colour (0xfff2c418), 262.0f } };
+        { "Input", juce::Colour (0xff3cd23c), 283.0f }, { "Output", juce::Colour (0xffe53935), 414.0f }, { "Filter", juce::Colour (0xffffe600), 560.0f } };
     for (auto& l : legend)
     {
         g.setColour (l.c);
-        g.fillRect (l.x, 254.0f, 14.0f, 2.0f);
-        g.drawText (l.name, juce::Rectangle<float> (l.x + 18.0f, 247.0f, 50.0f, 14.0f), juce::Justification::centredLeft, false);
+        g.fillRect (l.x, 555.0f, 34.0f, 4.0f);
+        g.drawText (l.name, juce::Rectangle<float> (l.x + 44.0f, 542.0f, 110.0f, 30.0f), juce::Justification::centredLeft, false);
     }
 }
 
@@ -441,50 +399,39 @@ void FreeFilterEditor::paint (juce::Graphics& g)
 
     g.addTransform (designToScreen());
 
-    // título
-    {
-        auto f = uiFont (22.0f, true, true);
-        g.setFont (f);
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.drawText ("FreeFilter", titleRect.translated (1.5f, 1.5f), juce::Justification::centredRight, false);
-        g.setColour (juce::Colours::white.withAlpha (0.92f));
-        g.drawText ("FreeFilter", titleRect, juce::Justification::centredRight, false);
-    }
+    LibreSkin::drawLogoLibreFilter (g, logoRect);
 
     // fila de lecturas (Morph / Hz / dB)
     {
-        const juce::Rectangle<float> strip { 22.0f, 33.0f, 410.0f, 28.0f };
-        g.setColour (juce::Colours::black.withAlpha (0.28f));
-        g.fillRoundedRectangle (strip, 3.0f);
-        g.setColour (juce::Colours::white);
-        g.setFont (uiFont (10.0f, true));
-        g.drawText ("Morph %", juce::Rectangle<float> (138.0f, 40.0f, 50.0f, 14.0f), juce::Justification::centredRight, false);
-        g.drawText ("Hz", juce::Rectangle<float> (244.0f, 40.0f, 30.0f, 14.0f), juce::Justification::centredRight, false);
-        g.drawText ("dB", juce::Rectangle<float> (338.0f, 40.0f, 28.0f, 14.0f), juce::Justification::centredRight, false);
+        g.setColour (textLight);
+        g.setFont (uiFont (23.0f, true));
+        g.drawText ("Morph %", morphLabel, juce::Justification::centredRight, false);
+        g.drawText ("Hz", hzLabel, juce::Justification::centredRight, false);
+        g.drawText ("dB", dbLabel, juce::Justification::centredRight, false);
 
         auto box = [&] (juce::Rectangle<float> r, const juce::String& txt, bool dim)
         {
-            g.setColour (juce::Colours::black);
-            g.fillRect (r);
-            g.setColour (juce::Colours::white.withAlpha (0.4f));
-            g.drawRect (r, 1.0f);
-            g.setColour (juce::Colours::white.withAlpha (dim ? 0.35f : 1.0f));
+            g.setColour (boxFill);
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (boxLine.withAlpha (0.7f));
+            g.drawRoundedRectangle (r, 4.0f, 2.0f);
+            g.setColour (textLight.withAlpha (dim ? 0.4f : 1.0f));
+            g.setFont (uiFont (25.0f, true));
             g.drawText (txt, r, juce::Justification::centred, false);
         };
         // Morph 0..200 %
         const float morphPct = processor.apvts.getRawParameterValue ("morph")->load();
         const bool morphOn = processor.isMatchOn();
-        const juce::Rectangle<float> bar (28.0f, 40.0f, 105.0f, 14.0f);
-        g.setColour (juce::Colour (0xff1a1a1a));
-        g.fillRect (bar);
-        g.setColour (juce::Colour (morphOn ? 0xff6d7fd8 : 0xff4a4a55));
-        g.fillRect (bar.withWidth (bar.getWidth() * morphPct / 200.0f));
-        g.setColour (juce::Colours::white.withAlpha (0.35f));
-        g.drawRect (bar, 1.0f);
-        g.drawVerticalLine ((int) (bar.getX() + bar.getWidth() * 0.5f), bar.getY(), bar.getBottom());
-        box ({ 192.0f, 38.0f, 50.0f, 18.0f }, juce::String (juce::roundToInt (morphPct)), ! morphOn);
-        box ({ 278.0f, 38.0f, 56.0f, 18.0f }, readHz, false);
-        box ({ 370.0f, 38.0f, 52.0f, 18.0f }, readDb, false);
+        g.setColour (juce::Colour (0xff0a1424));
+        g.fillRect (morphBar);
+        g.setColour (juce::Colour (morphOn ? 0xff6aa6e8 : 0xff4a5f7a));
+        g.fillRect (morphBar.withWidth (morphBar.getWidth() * morphPct / 200.0f));
+        g.setColour (boxLine.withAlpha (0.5f));
+        g.drawRect (morphBar, 2.0f);
+        g.drawVerticalLine ((int) (morphBar.getX() + morphBar.getWidth() * 0.5f), morphBar.getY(), morphBar.getBottom());
+        box (morphBox, juce::String (juce::roundToInt (morphPct)), ! morphOn);
+        box (hzBox, readHz, false);
+        box (dbBox, readDb, false);
     }
 
     paintAnalyzer (g);
@@ -496,36 +443,34 @@ void FreeFilterEditor::paint (juce::Graphics& g)
         juce::String msg = juce::Time::currentTimeMillis() < statusUntil ? statusText : idleStatus();
         if (msg.isNotEmpty())
         {
-            g.setFont (uiFont (10.0f, false, true));
-            g.setColour (juce::Colours::white.withAlpha (0.92f));
-            g.drawText (msg, juce::Rectangle<float> (32.0f, 78.0f, 330.0f, 14.0f), juce::Justification::centredLeft, false);
+            g.setFont (uiFont (21.0f, false, true));
+            g.setColour (textLight.withAlpha (0.92f));
+            g.drawText (msg, statusRect, juce::Justification::centredLeft, false);
         }
     }
 
-    // firma en la esquina inferior derecha
-    {
-        const juce::Rectangle<float> sig { 250.0f, 388.0f, 196.0f, 16.0f };
-        g.setFont (uiFont (12.0f, true));
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.drawText ("Recomp by VooD", sig.translated (1.0f, 1.0f), juce::Justification::centredRight, false);
-        g.setColour (juce::Colours::white.withAlpha (0.95f));
-        g.drawText ("Recomp by VooD", sig, juce::Justification::centredRight, false);
-        g.setFont (uiFont (8.5f));
-        g.setColour (juce::Colours::white.withAlpha (0.7f));
-        g.drawText (juce::String ("v") + JucePlugin_VersionString,
-                    juce::Rectangle<float> (250.0f, 404.0f, 196.0f, 11.0f), juce::Justification::centredRight, false);
-    }
+    // credito y version en la esquina inferior derecha
+    LibreSkin::drawLogoVooD (g, voodRect);
+    g.setFont (uiFont (15.0f));
+    g.setColour (textLight.withAlpha (0.6f));
+    g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
 }
 
 void FreeFilterEditor::paintAbout (juce::Graphics& g)
 {
+    skin.drawCredits (g, getLocalBounds().toFloat());
     g.addTransform (designToScreen());
-    g.setFont (uiFont (26.0f, true, true));
-    g.setColour (juce::Colours::white);
-    g.drawText ("FreeFilter", juce::Rectangle<float> (0.0f, 30.0f, (float) designW, 34.0f), juce::Justification::centred, false);
 
-    g.setFont (uiFont (12.0f));
-    g.setColour (juce::Colours::white.withAlpha (0.95f));
+    LibreSkin::drawLogoLibreFilter (g, juce::Rectangle<float> (190.0f, 70.0f, 560.0f, 114.0f));
+
+    const juce::Rectangle<float> panel (90.0f, 230.0f, 760.0f, 380.0f);
+    g.setColour (juce::Colour (0xff030c1a).withAlpha (0.55f));
+    g.fillRoundedRectangle (panel, 18.0f);
+    g.setColour (boxLine.withAlpha (0.45f));
+    g.drawRoundedRectangle (panel, 18.0f, 2.0f);
+
+    g.setFont (uiFont (26.0f));
+    g.setColour (textLight);
     g.drawFittedText (juce::String::fromUTF8 (
                           "Algoritmo original: ME FreeFilter (Steinberg Mastering Edition)\n"
                           "\xC2\xA9 1998-2001 Spectral Design GmbH.\n\n"
@@ -534,13 +479,12 @@ void FreeFilterEditor::paintAbout (juce::Graphics& g)
                           "Bandas iguales, Learn / Match / Morph y tercios de octava.\n"
                           "Contrastado con el original (ver docs/ANALISIS.md).\n\n"
                           "Clic para cerrar."),
-                      juce::Rectangle<int> (30, 80, designW - 60, 240), juce::Justification::centred, 12);
+                      panel.reduced (24.0f).toNearestInt(), juce::Justification::centred, 12);
 
-    g.setFont (uiFont (12.0f, true));
-    g.drawText ("Recomp by VooD", juce::Rectangle<float> (250.0f, 388.0f, 196.0f, 16.0f), juce::Justification::centredRight, false);
-    g.setFont (uiFont (8.5f));
-    g.drawText (juce::String ("v") + JucePlugin_VersionString,
-                juce::Rectangle<float> (250.0f, 404.0f, 196.0f, 11.0f), juce::Justification::centredRight, false);
+    LibreSkin::drawLogoVooD (g, juce::Rectangle<float> (0.0f, 0.0f, 205.0f, 65.0f).withCentre ({ designW * 0.5f + 4.0f, 690.0f }));
+    g.setFont (uiFont (15.0f));
+    g.setColour (textLight.withAlpha (0.6f));
+    g.drawText (juce::String ("v") + JucePlugin_VersionString, versionRect, juce::Justification::centredRight, false);
 }
 
 //==============================================================================
@@ -643,7 +587,7 @@ void FreeFilterEditor::presetDelete()
 
 void FreeFilterEditor::layoutPresetEditor()
 {
-    const auto r = juce::Rectangle<float> (48.0f, 388.0f, 152.0f, 16.0f).transformedBy (designToScreen()).toNearestInt();
+    const auto r = presetField.transformedBy (designToScreen()).toNearestInt();
     presetName.setBounds (r);
     presetName.applyFontToAllText (juce::Font (juce::FontOptions ((float) r.getHeight() * 0.62f)));
 }
@@ -678,7 +622,7 @@ void FreeFilterEditor::mouseMove (const juce::MouseEvent& e)
     hover = toDesign (e.position);
     readHz.clear();
     readDb.clear();
-    if (boardRect.expanded (0.0f, 8.0f).contains (hover))
+    if (boardRect.expanded (0.0f, 16.0f).contains (hover))
     {
         const int b = bandAt (hover.x);
         const float centre = processor.isThirdOctave() ? (float) ff::kThirdOctave[b]
@@ -746,7 +690,7 @@ void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
     }
 
     // barra de Morph
-    if (juce::Rectangle<float> (28.0f, 38.0f, 105.0f, 18.0f).contains (p))
+    if (morphBar.expanded (0.0f, 4.0f).contains (p))
     {
         if (processor.isMatchOn()) { morphDragging = true; setMorphFromX (p.x); }
         else setStatus ("Disabled. Activate match button first !");
@@ -754,7 +698,7 @@ void FreeFilterEditor::mouseDown (const juce::MouseEvent& e)
     }
 
     // tablero de sliders
-    if (boardRect.expanded (0.0f, 6.0f).contains (p))
+    if (boardRect.expanded (0.0f, 12.0f).contains (p))
     {
         dragStart = p;
         lastBand = -1;
@@ -829,7 +773,7 @@ void FreeFilterEditor::mouseUp (const juce::MouseEvent&)
 void FreeFilterEditor::mouseDoubleClick (const juce::MouseEvent& e)
 {
     const auto p = toDesign (e.position);
-    if (! boardRect.expanded (0.0f, 6.0f).contains (p)) return;
+    if (! boardRect.expanded (0.0f, 12.0f).contains (p)) return;
     if (drawMode == DrawMode::level)          // solo los sliders; lo aprendido y Match no se tocan (eso es Reset)
         for (int i = 0; i < ff::kBands; ++i) setBand (i, 0.0f);
     else

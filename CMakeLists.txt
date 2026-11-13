@@ -5,7 +5,7 @@ if(POLICY CMP0141)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
 endif()
 
-project(FreeFilter VERSION 1.2.0 LANGUAGES C CXX)
+project(FreeFilter VERSION 1.3.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,11 +47,28 @@ juce_add_plugin(FreeFilter
     AU_MAIN_TYPE                kAudioUnitType_Effect
     BUNDLE_ID                   com.vood.freefilter)
 
+# Recursos graficos del pack LibreFilter, incrustados en el binario (BinaryData.h)
+juce_add_binary_data(FreeFilterAssets
+    SOURCES
+        resources/librefilter/plugin_background.svg
+        resources/librefilter/button_normal.svg
+        resources/librefilter/button_active.svg
+        resources/librefilter/button_disabled.svg
+        resources/librefilter/graph_frame.svg
+        resources/librefilter/slider_track.svg
+        resources/librefilter/slider_thumb.svg
+        resources/librefilter/knob_purple.svg
+        resources/librefilter/credits_background.png)
+set_target_properties(FreeFilterAssets PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_sources(FreeFilter PRIVATE
     src/PluginProcessor.cpp
     src/PluginProcessor.h
     src/PluginEditor.cpp
     src/PluginEditor.h
+    src/EditorLayout.h
+    src/LibreSkin.cpp
+    src/LibreSkin.h
     src/FreeFilterDSP.h)
 
 target_compile_definitions(FreeFilter PUBLIC
@@ -62,6 +79,7 @@ target_compile_definitions(FreeFilter PUBLIC
 
 target_link_libraries(FreeFilter
     PRIVATE
+        FreeFilterAssets
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
