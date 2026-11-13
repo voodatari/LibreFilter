@@ -1,6 +1,6 @@
 # LibreFilter 1.3 (VST3 / AU, Windows x64 + macOS Apple Silicon)
 
-<p align="center"><img src="docs/screenshot.png" width="620" alt="LibreFilter: analizador de espectro, 30 sliders y controles"></p>
+<p align="center"><img src="docs/screenshot.png" width="400" alt="LibreFilter: analizador de espectro, 30 sliders y controles"></p>
 
 Reimplementación en JUCE 8 del ecualizador de filtro libre **ME FreeFilter** (Steinberg Mastering Edition,
 2001). Formatos: **VST3**, **AU** y **Standalone**. Compila en **Windows x64** y **macOS arm64** (M1–M4)
